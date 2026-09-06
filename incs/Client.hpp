@@ -150,10 +150,8 @@ private:
 
 	std::size_t						_adjustBufferSize(std::size_t payload_size);
 
-	void							_buffNflushErrorHandler(ssize_t bytes_sent, int fd);
 	void							_stateTransitionHandler(int fd);
-	void							_clearStream(std::stringstream& stream);
-	void							_clearStream(std::ifstream& stream);
+	void							_clearStream(std::istream& stream);
 
 };
 

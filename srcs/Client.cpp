@@ -53,7 +53,6 @@ Client::Client(const sockaddr_in socket, const Config::Socket* config)
 	pushResponse();
 
 	return;
-
 }
 
 /*	@brief Destructor	*/
@@ -90,7 +89,6 @@ Client::~Client(void) {
 	 _request_queue.clear();
 
 	return;
-
 }
 
 // DEBUG BEGIN
@@ -318,9 +316,7 @@ void Client::parseDataFromPeer(void) {
 
 			if (!request.requires_CGI) promoteFile(request);
 			break;
-
 		}
-
 	}
 
 	dumpRequest(&request);
@@ -360,11 +356,8 @@ void Client::parseDataFromPeer(void) {
 			}
 			_instream.reset();
 			break;
-
 	}
-
 	return;
-
 }
 
 void Client::queueOutgoingData(void) {
@@ -411,68 +404,26 @@ void Client::queueOutgoingData(void) {
 void Client::sendDataToTCPPeer(int fd) {
 
 	ssize_t bytes_sent = 0;
+	std::istream* data = NULL;
 
 	switch (_state) {
 
 	case SENDING_HEADERS:
 
-		log.info("client_" + i2a(fd) + " state: SENDING_HEADERS");
-		try {
-			bytes_sent = buffNflush(_response.headers, _outstream, fd);
-		} catch (std::exception& e) {
-			log.error(e.what());
-			_state = ERROR;
-			return;
-		}
-		if (bytes_sent <= 0) {
-			_buffNflushErrorHandler(bytes_sent, fd);
-			return;
-		} else {
-			log.debug("client_" + i2a(fd) + ": bytes sent: " + i2a(bytes_sent));
-			_last_event = std::time(NULL);
-		}
+		log.info("client_" + i2a(fd) + " sending response headers");
 
-		if (_response.headers.eof() && _outstream.begin == _outstream.end) {
-			_clearStream(_response.headers);
-
-			if (_response.body.sink == NONE) {
-				_stateTransitionHandler(fd);
-
-			} else {
-
-				_state = SENDING_BODY;
-				log.debug("client_" + i2a(fd) + ": state set to SENDING_BODY");
-			}
-		}
+		data = &_response.headers;
 		break;
 
 	case SENDING_BODY:
 
-		log.info("client_" + i2a(fd) + " state: SENDING_BODY");
+		log.info("client_" + i2a(fd) + " sending response body");
+
 		switch (_response.body.sink) {
 
 		case HEAP:
 
-			try {
-				bytes_sent = buffNflush(_response.body.temp, _outstream, fd);
-			} catch (std::exception& e) {
-				log.error(e.what());
-				_state = ERROR;
-				return;
-			}
-			if (bytes_sent <= 0) {
-				_buffNflushErrorHandler(bytes_sent, fd);
-				return;
-			} else {
-				log.debug("client_" + i2a(fd) + ": bytes sent: " + i2a(bytes_sent));
-				_last_event = std::time(NULL);
-			}
-
-			if (_response.body.temp.eof() && _outstream.begin == _outstream.end) {
-				log.info("client_" + i2a(fd) + ": full body/file sent");
-				_clearStream(_response.body.temp);
-				_stateTransitionHandler(fd);
-			}
+			data = &_response.body.temp;
 			break;
 
 		case DISK:
@@ -482,25 +433,66 @@ void Client::sendDataToTCPPeer(int fd) {
 				_outstream.data.resize(buffer_size);
 			}
 
-			try {
-				bytes_sent = buffNflush(_response.body.file, _outstream, fd);
-			} catch (std::exception& e) {
-				log.error(e.what());
-				_state = ERROR;
-				return;
-			}
-			if (bytes_sent <= 0) {
-				_buffNflushErrorHandler(bytes_sent, fd);
-				return;
-			} else {
-				log.debug("client_" + i2a(fd) + ": bytes sent: " + i2a(bytes_sent));
-				_last_event = std::time(NULL);
-			}
+			data = &_response.body.file;
+			break;
 
-			if (_response.body.file.eof() && _outstream.begin == _outstream.end) {
-				log.info("client_" + i2a(fd) + ": full body/file sent");
-				_clearStream(_response.body.file);
+		default:
+			break;
+		}
+
+	default:
+		break;
+	}
+
+	try {
+
+		bytes_sent = buffNflush(*data, _outstream, fd);
+
+	} catch (std::exception& e) {
+
+		log.error(e.what());
+		_state = ERROR;
+		return;
+
+	}
+
+	if (bytes_sent <= 0) {
+
+		if (bytes_sent == -1) {
+			log.error("send: client_" + i2a(fd) + ": " + std::string(strerror(errno)));
+		}
+		_state = ERROR;
+		return;
+
+	} else {
+
+		log.debug("client_" + i2a(fd) + ": bytes sent: " + i2a(bytes_sent));
+		_last_event = std::time(NULL);
+
+	}
+
+	if (data->eof() && _outstream.begin == _outstream.end) {
+
+		_clearStream(*data);
+
+		switch (_state) {
+
+		case SENDING_HEADERS:
+
+			if (_response.body.sink == NONE) {
+				log.info("client_" + i2a(fd) + ": full response sent");
 				_stateTransitionHandler(fd);
+			} else {
+				log.info("client_" + i2a(fd) + ": all headers sent");
+				_state = SENDING_BODY;
+			}
+			break;
+
+		case SENDING_BODY:
+
+			log.info("client_" + i2a(fd) + ": full body/file sent");
+			_stateTransitionHandler(fd);
+			if (_response.body.sink == DISK && _outstream.data.size() != BUFFER_SIZE) {
 				_outstream.data.resize(BUFFER_SIZE);
 			}
 			break;
@@ -508,8 +500,6 @@ void Client::sendDataToTCPPeer(int fd) {
 		default:
 			break;
 		}
-	default:
-		break;
 	}
 	return;
 }
@@ -600,7 +590,6 @@ void Client::reset(void) {
 
 	_last_event = std::time(NULL);
 	return;
-
 }
 
   //~~~~~~~~~~~//
@@ -632,14 +621,6 @@ std::size_t Client::_adjustBufferSize(std::size_t payload_size) {
 	else return 256 * 1024;
 }
 
-void Client::_buffNflushErrorHandler(ssize_t bytes_sent, int fd) {
-	if (bytes_sent == -1) {
-		log.error("send: client_" + i2a(fd) + ": " + std::string(strerror(errno)));
-	}
-	_state = ERROR;
-	return;
-}
-
 void Client::_stateTransitionHandler(int fd) {
 	if (_blocked_from_receiving) {
 		_state = REJECTED;
@@ -651,15 +632,22 @@ void Client::_stateTransitionHandler(int fd) {
 		_state = IDLE;
 		log.debug("client_" + i2a(fd) + ": state set to IDLE");
 	}
+	return;
 }
 
-// Overload for std::stringstream
-void Client::_clearStream(std::stringstream& stream) {
-	stream.str("");
-	stream.clear();
-}
+void Client::_clearStream(std::istream& stream) {
 
-// Overload for std::ifstream
-void Client::_clearStream(std::ifstream& stream) {
-	stream.close();
+	std::stringstream* stringstream = dynamic_cast<std::stringstream*>(&stream);
+	if (stringstream != NULL) {
+		stringstream->str("");
+		stringstream->clear();
+		return;
+	}
+
+	std::ifstream* filestream = dynamic_cast<std::ifstream*>(&stream);
+	if (filestream != NULL) {
+		filestream->close();
+		return;
+	}
+
 }
