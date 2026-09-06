@@ -45,11 +45,9 @@ public:
     int   stdinFd()  const; // -1 once the write end is closed
     int   stdoutFd() const; // -1 once the read end is closed
 
-    // for a caller doing its own buffered write()/read() against
-    // stdinFd()/stdoutFd() (e.g. CgiHandler) instead of handleWritable()/
-    // handleReadable() -- closes the fd and updates it to -1, same as those
-    // do internally once done, so wantsWrite()/wantsRead()/isDone() and the
-    // destructor stay correct either way.
+    // closes the fd and sets it to -1, same as handleWritable()/
+    // handleReadable() do once done, so wantsWrite()/wantsRead()/isDone()
+    // and the destructor stay correct either way
     void closeStdin();
     void closeStdout();
 
@@ -72,6 +70,12 @@ public:
 private:
     CgiProcess(const CgiProcess&);
     CgiProcess& operator=(const CgiProcess&);
+
+    // one already-extracted header line -> _headers/_status/_content_type
+    void _consumeHeaderLine(const std::string& line);
+    // finds complete lines in _outstream, commits begin past each one;
+    // once the blank line is hit, the rest becomes _body
+    void _consumeAvailableOutput();
 
     // stored for spawn() (next step), which forks+execve's using these
     std::string                        _path;
@@ -98,8 +102,7 @@ private:
     Buffer      _outstream; // <- our stdout
     ScriptState _state;
 
-    // response, parsed incrementally as bytes arrive instead of all at
-    // once from a fully-buffered _outstream -- not used yet
+    // response, parsed incrementally as bytes arrive
     std::map<std::string, std::string> _headers;
     StatusCode  _status;
     std::string _content_type;

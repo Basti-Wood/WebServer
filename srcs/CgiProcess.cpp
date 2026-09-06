@@ -1,4 +1,5 @@
 #include "../incs/CgiProcess.hpp"
+#include "../incs/utils.hpp"
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -18,14 +19,6 @@ static const int CGI_TIMEOUT_S = 10;
 static inline std::string to_lower(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(), ::tolower);
     return s;
-}
-
-static inline std::string trim(const std::string& s) {
-    size_t b = 0;
-    while (b < s.size() && (s[b] == ' ' || s[b] == '\t' || s[b] == '\r' || s[b] == '\n')) ++b;
-    size_t e = s.size();
-    while (e > b && (s[e-1] == ' ' || s[e-1] == '\t' || s[e-1] == '\r' || s[e-1] == '\n')) --e;
-    return s.substr(b, e-b);
 }
 
 CgiProcess::CgiProcess(const std::string& path, const std::vector<std::string>& args,
@@ -216,6 +209,71 @@ void CgiProcess::readStdout() {
 		closeStdout();
 		_state = COMPLETE;
 	}
+
+}
+
+// one already-extracted header line, e.g. "Content-Type: text/html"
+void CgiProcess::_consumeHeaderLine(const std::string& raw_line) {
+
+	std::string line = trim(raw_line);
+	if (line.empty())
+		return;
+
+	std::size_t colon = line.find(':');
+	if (colon == std::string::npos)
+		return;
+
+	std::string key = line.substr(0, colon);
+	std::string value = trim(line.substr(colon + 1));
+	std::string key_lower = tolowerASCII(key);
+
+	if (key_lower == "status") {
+		int code = std::atoi(value.c_str());
+		if (code >= 100 && code <= 599) {
+			_status = static_cast<StatusCode>(code);
+			_has_status = true;
+		}
+		return;
+	}
+	if (key_lower == "content-type")
+		_content_type = value;
+	if (key_lower == "location")
+		_has_location = true;
+
+	_headers[key] = value;
+
+}
+
+// consumes whatever complete lines are in _outstream, same technique as
+// parseRequestLine()/parseHeaders(), just for cgi output
+void CgiProcess::_consumeAvailableOutput() {
+
+	if (_headers_done) {
+		_body += _outstream.substr(0);
+		_outstream.reset();
+		return;
+	}
+
+	ssize_t nl;
+	while (!_headers_done && (nl = _outstream.find('\n')) != -1) {
+
+		std::string line = _outstream.substr(0, static_cast<std::size_t>(nl));
+		if (!line.empty() && line[line.size() - 1] == '\r')
+			line.resize(line.size() - 1);
+
+		_outstream.begin += static_cast<std::size_t>(nl) + 1;
+
+		if (line.empty()) {
+			_headers_done = true;
+			_body += _outstream.substr(0);
+			_outstream.reset();
+			return;
+		}
+
+		_consumeHeaderLine(line);
+	}
+
+	_outstream.compact(); // free up what we already committed past
 
 }
 
