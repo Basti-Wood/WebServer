@@ -21,7 +21,7 @@ class Session {
 
 private:
 
-	std::string								_session_id;
+	std::string								_id;
 
 	std::map<std::string, std::string>		_data;
 
