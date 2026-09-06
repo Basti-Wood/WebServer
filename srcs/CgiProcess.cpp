@@ -205,7 +205,11 @@ void CgiProcess::readStdout() {
 		return;
 	}
 
+	if (got > 0)
+		_consumeAvailableOutput();
+
 	if (got == 0) {
+		_consumeAvailableOutput(); // fold in whatever's left before COMPLETE
 		closeStdout();
 		_state = COMPLETE;
 	}
