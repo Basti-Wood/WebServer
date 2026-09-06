@@ -1,5 +1,6 @@
 #include "../incs/CgiProcess.hpp"
 #include "../incs/utils.hpp"
+#include "../incs/constexpr.hpp"
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -216,16 +217,31 @@ void CgiProcess::readStdout() {
 
 }
 
-// one already-extracted header line, e.g. "Content-Type: text/html"
-void CgiProcess::_consumeHeaderLine(const std::string& raw_line) {
+static inline bool isLineWS(char c) {
+	return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
 
-	std::string line = trim(raw_line);
-	if (line.empty())
-		return;
+// trims directly against the buffer first, so there's only one extraction
+// (already trimmed) instead of one to pull the raw line out and another
+// inside trim()
+bool CgiProcess::_consumeHeaderLine(std::size_t line_len) {
+
+	std::size_t first = 0;
+	while (first < line_len && isLineWS(_outstream.data[_outstream.begin + first]))
+		++first;
+
+	std::size_t last = line_len;
+	while (last > first && isLineWS(_outstream.data[_outstream.begin + last - 1]))
+		--last;
+
+	if (first == last)
+		return true; // blank line, headers are done
+
+	std::string line = _outstream.substr(first, last);
 
 	std::size_t colon = line.find(':');
 	if (colon == std::string::npos)
-		return;
+		return false;
 
 	std::string key = line.substr(0, colon);
 	std::string value = trim(line.substr(colon + 1));
@@ -237,7 +253,7 @@ void CgiProcess::_consumeHeaderLine(const std::string& raw_line) {
 			_status = static_cast<StatusCode>(code);
 			_has_status = true;
 		}
-		return;
+		return false;
 	}
 	if (key_lower == "content-type")
 		_content_type = value;
@@ -245,6 +261,7 @@ void CgiProcess::_consumeHeaderLine(const std::string& raw_line) {
 		_has_location = true;
 
 	_headers[key] = value;
+	return false;
 
 }
 
@@ -259,22 +276,20 @@ void CgiProcess::_consumeAvailableOutput() {
 	}
 
 	ssize_t nl;
-	while (!_headers_done && (nl = _outstream.find('\n')) != -1) {
+	while (!_headers_done && (nl = _outstream.find(http::LF)) != -1) {
 
-		std::string line = _outstream.substr(0, static_cast<std::size_t>(nl));
-		if (!line.empty() && line[line.size() - 1] == '\r')
-			line.resize(line.size() - 1);
+		std::size_t line_len = static_cast<std::size_t>(nl);
+		bool blank = _consumeHeaderLine(line_len);
 
-		_outstream.begin += static_cast<std::size_t>(nl) + 1;
+		_outstream.begin += line_len + 1;
 
-		if (line.empty()) {
+		if (blank) {
 			_headers_done = true;
 			_body += _outstream.substr(0);
 			_outstream.reset();
 			return;
 		}
 
-		_consumeHeaderLine(line);
 	}
 
 	_outstream.compact(); // free up what we already committed past

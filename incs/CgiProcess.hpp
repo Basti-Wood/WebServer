@@ -71,8 +71,10 @@ private:
     CgiProcess(const CgiProcess&);
     CgiProcess& operator=(const CgiProcess&);
 
-    // one already-extracted header line -> _headers/_status/_content_type
-    void _consumeHeaderLine(const std::string& line);
+    // parses the line sitting at _outstream.begin, line_len chars long
+    // (not counting the '\n'), straight off the buffer -> _headers/etc.
+    // returns true if it was the blank line ending the headers
+    bool _consumeHeaderLine(std::size_t line_len);
     // finds complete lines in _outstream, commits begin past each one;
     // once the blank line is hit, the rest becomes _body
     void _consumeAvailableOutput();
