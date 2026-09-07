@@ -48,7 +48,7 @@ std::map<std::string,std::string> build_cgi_env(const HTTPRequest& req,
 
     if (!req.cgi.path_info.empty()) {
         env["PATH_INFO"] = req.cgi.path_info;
-        env["PATH_TRANSLATED"] = domain.root + req.resolved.filepath;
+        env["PATH_TRANSLATED"] = req.resolved.filepath;
     }
 
     // sin_port is network byte order, ntohs() before treating it as a number
