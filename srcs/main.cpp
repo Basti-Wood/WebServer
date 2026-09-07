@@ -19,6 +19,8 @@
 
 int main(int argc, char** argv) {
 
+	srand(std::time(NULL));
+
 	std::string config_file;
 	std::string av[argc];
 
@@ -97,7 +99,7 @@ int main(int argc, char** argv) {
 
 	try {
 
-		load.config(config_file);
+		load(config_file);
 		log.debug("Parsing configuration file: " + config_file);
 
 		sockets_count = configs.size();

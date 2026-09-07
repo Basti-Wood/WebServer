@@ -37,10 +37,11 @@ public:
 	enum State {
 		IDLE,
 		RECEIVING_HEADERS,
-		DISPATCHING,
+		RETRIEVING_SESSION,
 		RECEIVING_BODY,
-		PREPARING_RESPONSE,
+		DISPATCHING,
 		AWAITING_CGI_OUTPUT,
+		PREPARING_RESPONSE,
 		PENDING_RESPONSE,
 		SENDING_HEADERS,
 		SENDING_BODY,
@@ -122,8 +123,8 @@ private:
 
 	static const time_t				IDLE_TIMEOUT_SECONDS		= 60;
 	static const time_t				HEADER_TIMEOUT_SECONDS		= 10;
-	static const time_t				DISPATCH_TIMEOUT_SECONDS	= 120;
 	static const time_t				BODY_TIMEOUT_SECONDS		= 120;
+	static const time_t				PROCESSING_TIMEOUT_SECONDS	= 120;
 	static const time_t				REJECTED_TIMEOUT_SECONDS	= 10;
 
 	State							_state;

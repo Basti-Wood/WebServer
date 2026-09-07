@@ -17,14 +17,12 @@
 // #include "Buffer.hpp"
 #include "HTTPResponse.hpp"
 #include "HTTPParameters.hpp"
+#include "Session.hpp"
+#include <cstring>
+#include <cstddef>
 #include <netinet/in.h>
 
 class CgiHandler; // full type only needed where we delete it, in HTTPRequest.cpp
-// #include <fstream>
-#include <sstream>
-#include <string>
-#include <cstring>
-#include <cstddef>
 
 class HTTPRequest {
 
@@ -262,6 +260,7 @@ public:
 	const std::string*									getHeader(const std::string& key) const;
 	const std::map<std::string, std::string>&			getHeaders(void) const;
 	const std::string*									getCookie(const std::string& key) const;
+	const std::string&									getSessionID(void) const;
 
 	const std::stringstream&							getBody(void) const;
 
@@ -271,9 +270,10 @@ public:
 	void												setVersion(const std::string&);
 	void												setHeader(const std::string& key, const std::string& value);
 	void												setCookie(const Cookie& cookie);
+	void												setSessionID(const std::string& session_id);
+	void												setSession(const Session& session);
 
 	bool												extractContentLength(void);
-	bool												extractSessionID(void);
 
 	void												reset(void);
 
@@ -293,6 +293,8 @@ private:
 	std::vector<Cookie>									_cookies;
 
 	std::string											_session_id;
+
+	const Session*										_session;
 
 };
 

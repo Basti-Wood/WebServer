@@ -309,7 +309,7 @@ ConfigLoader& ConfigLoader::instance(void) {
 }
 
 // Read line-by-line; fills config object
-void ConfigLoader::config(const std::string& config_file) {
+void ConfigLoader::loadConfig(const std::string& config_file) {
 
 	if(!isConfigFile(config_file)) {
 		throw std::runtime_error("config error: invalid file extension: " + config_file);
@@ -361,7 +361,7 @@ void ConfigLoader::config(const std::string& config_file) {
 
 }
 
-Method ConfigLoader::extractMethod(const std::string& method) {
+static Method extractMethod(const std::string& method) {
 
 	static const std::string valid_methods[
 		static_cast<int>(METHOD_COUNT)

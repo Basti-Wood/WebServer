@@ -14,20 +14,35 @@
 #define SESSION_HPP
 
 #include <string>
+#include <vector>
 #include <ctime>
-#include <map>
 
 class Session {
 
+public:
+
+	Session(void);
+	~Session(void);
+
+	static const unsigned short						LIFETIME = 3600;
+
+	const std::vector<std::string>&					getAttributes(void) const;
+
+	const time_t									getExpiraionTime(void) const;
+
+	void											uptdateTimeStamp(void);
+	void											setAttribute(const std::string& attribute);
+
 private:
 
-	std::string								_id;
+	Session(const Session& other);
+	Session& operator = (const Session& other);
 
-	std::map<std::string, std::string>		_data;
+	std::vector<std::string>						_attributes;
 
-	time_t									_createdAt;
-	time_t 									_touchedAt;
-	time_t 									_expiresAt;
+	time_t											_createdAt;
+	time_t											_touchedAt;
+	time_t											_expiresAt;
 
 };
 

@@ -239,6 +239,12 @@ bool RequestParser::_parseHeaderLine(const Buffer& buffer, HTTPRequest& request)
 		}
 	}
 
+	if (equalCI(key, "cookie")) {
+		if (!HTTPCookie::extractCookies(value, request)) {
+			log.warn("request: invalid cookie header provided");
+		}
+	}
+
 	return true;
 
 }
@@ -335,13 +341,9 @@ bool RequestParser::_parseHeaders(const Buffer& buffer, HTTPRequest& request) {
 				}
 			}
 
-			const std::string* cookie = request.getHeader("cookie");
-			if (cookie != NULL) {
-				if (!HTTPCookie::extractCookies(*cookie, request)) {
-					log.warn("request: invalid cookie header provided");
-				} else if (!request.extractSessionID()) {
-					log.warn("request: no session id provided");
-				}
+			const std::string* session_id = request.getCookie("session_id");
+			if (session_id != NULL) {
+				request.setSessionID(*session_id);
 			}
 
 			const std::string* transfer_endcoding = request.getHeader("transfer-encoding");

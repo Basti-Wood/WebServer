@@ -32,30 +32,33 @@ namespace HTTPCookie {
 
 		value.clear();
 
+		/*
+		* Quoted string
+		*/
 		if (pos < s.size() && s[pos] == '"') {
+			++pos; // opening quote
 
-			++pos;
-
-			while (pos < s.size() &&
-				isCookieOctet(s[pos])) {
-
+			while (pos < s.size() && isCookieOctet(s[pos])) {
 				value += s[pos];
 				++pos;
 			}
 
-			if (pos >= s.size() ||
-				s[pos] != '"') {
-
-				return false;
+			if (pos == s.size()) {
+				return false; // unterminated quoted value
 			}
 
-			++pos;
+			if (s[pos] != '"') {
+				return false; // invalid character before closing quote
+			}
+
+			++pos; // closing qupte
 			return true;
 		}
 
-		while (pos < s.size() &&
-			isCookieOctet(s[pos])) {
-
+		/*
+		* Unquoted string
+		*/
+		while (pos < s.size() && isCookieOctet(s[pos])) {
 			value += s[pos];
 			++pos;
 		}
@@ -98,7 +101,9 @@ namespace HTTPCookie {
 				return false;
 			}
 
-			// cookies.push_back(cookie);
+			/*
+			* Add cookie to request
+			*/
 			request.setCookie(cookie);
 
 			/*

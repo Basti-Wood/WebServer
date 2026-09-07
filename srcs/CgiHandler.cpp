@@ -2,7 +2,6 @@
 #include "../incs/CgiEnv.hpp"
 #include "../incs/Logger.hpp"
 #include "../incs/utils.hpp"
-#include <cerrno>
 #include <cstdlib>
 #include <fstream>
 #include <sstream>

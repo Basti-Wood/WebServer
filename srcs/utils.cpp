@@ -222,11 +222,11 @@ std::string unquote(const std::string& str) {
 	return str;
 }
 
-std::string randomHexString(std::size_t width) {
+std::string randomHexString(std::size_t byte_width) {
 
 	static const char hex[] = "0123456789abcdef";
 
-	unsigned char* bytes = new unsigned char[width];
+	unsigned char* bytes = new unsigned char[byte_width];
 
 	try {
 		std::ifstream urandom("/dev/urandom", std::ios::in | std::ios::binary);
@@ -235,16 +235,16 @@ std::string randomHexString(std::size_t width) {
 			throw std::runtime_error("cannot open /dev/urandom");
 		}
 
-		urandom.read(reinterpret_cast<char*>(bytes), static_cast<std::streamsize>(width));
+		urandom.read(reinterpret_cast<char*>(bytes), static_cast<std::streamsize>(byte_width));
 
-		if (urandom.gcount() != static_cast<std::streamsize>(width)) {
+		if (urandom.gcount() != static_cast<std::streamsize>(byte_width)) {
 			throw std::runtime_error("cannot read /dev/urandom");
 		}
 
 		std::string result;
-		result.reserve(width * 2);
+		result.reserve(byte_width * 2);
 
-		for (std::size_t i = 0; i < width; ++i) {
+		for (std::size_t i = 0; i < byte_width; ++i) {
 			result += hex[bytes[i] >> 4];
 			result += hex[bytes[i] & 0x0f];
 		}
@@ -254,8 +254,12 @@ std::string randomHexString(std::size_t width) {
 	}
 	catch (std::exception& e) {
 		delete [] bytes;
-		log.error("hexgen: " + std::string(e.what()));
-		return i2a(std::time(NULL) * errno == 0 ? 1 : errno);
+		log.error("hexgen: " + std::string(e.what()) + ". Falling back to std::rand");
+		std::string unique_id;
+		while (unique_id.empty() || unique_id.size() < byte_width * 2) {
+			unique_id += i2a(std::rand());
+		}
+		return unique_id;
 	}
 }
 

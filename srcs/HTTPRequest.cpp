@@ -42,6 +42,7 @@ HTTPRequest::HTTPRequest(const sockaddr_in* remote_socket, const sockaddr_in* se
 	_query.clear();
 	_version.clear();
 	_headers.clear();
+	_session = NULL;
 	return;
 }
 
@@ -99,6 +100,10 @@ const std::string* HTTPRequest::getCookie(const std::string& name) const {
 	return NULL;
 }
 
+const std::string& HTTPRequest::getSessionID(void) const {
+	return _session_id;
+}
+
 const std::map<std::string, std::string>& HTTPRequest::getHeaders(void) const {
 	return _headers;
 }
@@ -144,6 +149,15 @@ void HTTPRequest::setCookie(const Cookie& cookie) {
 	return;
 }
 
+void HTTPRequest::setSessionID(const std::string& session_id) {
+	_session_id = session_id;
+	return;
+}
+
+void HTTPRequest::setSession(const Session& session) {
+	_session = &session;
+}
+
 bool HTTPRequest::extractContentLength(void) {
 
 	const std::string* value = getHeader("content-length");
@@ -156,18 +170,6 @@ bool HTTPRequest::extractContentLength(void) {
 		return false; // malformed content-length header
 
 	body.size = size;
-	return true;
-
-}
-
-bool HTTPRequest::extractSessionID(void) {
-
-	if (_cookies.empty()) return false;
-
-	const std::string* session_id = getCookie("session_id");
-	if (session_id == NULL) return false;
-
-	_session_id = *session_id;
 	return true;
 
 }
@@ -187,6 +189,7 @@ void HTTPRequest::reset(void) {
 	_query.clear();
 	_version.clear();
 	_headers.clear();
+	_session = NULL;
 
 	return;
 
@@ -206,7 +209,8 @@ HTTPRequest::HTTPRequest(const HTTPRequest& other)
 		_path(other._path),
 		_query(other._query),
 		_version(other._version),
-		_headers(other._headers) {
+		_headers(other._headers),
+		_session(other._session) {
 	log.debug("HTTPRequest Copy Constructor called");
 	return;
 }
@@ -223,6 +227,7 @@ HTTPRequest& HTTPRequest::operator = (const HTTPRequest& other) {
 		_query = other._query;
 		_version = other._version;
 		_headers = other._headers;
+		_session = NULL;
 	}
 	log.debug("HTTPRequest Copy Assignment Operator called");
 	return *this;
