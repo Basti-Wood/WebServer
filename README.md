@@ -58,7 +58,7 @@ The config file has a block structure with Nginx-like directives. Comments start
 | `root` | `root <path>;` | document root for this location | ❌ |
 | `alias` | `alias <path>;` | serve files from another directory (incompatible with `root`) | ❌ |
 | `redirect` | `redirect <path>;` | redirect requests to another path | ❌ |
-| `allow_methods` | `allow_methods <methods...>;` | allowed HTTP methods: `GET POST DELETE` | ❌ |
+| `allow_methods` | `allow_methods <methods...>;` | allowed HTTP methods: `GET HEAD POST PUT DELETE` | ❌ |
 | `autoindex` | `autoindex <on/off>;` | toggle directory listing | ❌ |
 | `index` | `index <file...>;` | overrides the domain index files | ❌ |
 | `upload_dir` | `upload_dir <path>;` | where uploaded files (POST/PUT) are saved | ❌ |
