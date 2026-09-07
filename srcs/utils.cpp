@@ -131,10 +131,13 @@ void dumpRequest(const HTTPRequest* request) {
 		log.debug("Content-Type:\t" + *type);
 	const std::string* disposition = request->getHeader("content-disposition");
 	if (disposition != NULL)
-		log.debug("Content-Type:\t" + *disposition);
+		log.debug("Content-Disposition:\t" + *disposition);
 	const std::string* content_length = request->getHeader("content-length");
 	if (content_length != NULL)
 		log.debug("Content-Length:\t" + *content_length);
+	const std::string* cookie = request->getHeader("cookie");
+	if (cookie != NULL)
+		log.debug("Cookie:\t\t" + *cookie);
 }
 // DEBUG END
 
