@@ -28,7 +28,7 @@ public:
 
 	const std::vector<std::string>&					getAttributes(void) const;
 
-	const time_t									getExpiraionTime(void) const;
+	const time_t									getExpirationTime(void) const;
 
 	void											uptdateTimeStamp(void);
 	void											setAttribute(const std::string& attribute);

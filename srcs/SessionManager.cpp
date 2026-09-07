@@ -50,7 +50,7 @@ void SessionManager::getSession(Client& client) {
 		std::map<std::string, Session*>::iterator it = _sessions.find(session_id);
 		if (it != _sessions.end()) {
 			Session& session = *it->second;
-			if (session.getExpiraionTime() > now) {
+			if (session.getExpirationTime() > now) {
 				session.uptdateTimeStamp();
 				request.setSession(session);
 				client.setState(Client::DISPATCHING);
