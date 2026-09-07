@@ -17,11 +17,6 @@
 
 static const int CGI_TIMEOUT_S = 10;
 
-static inline std::string to_lower(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
-    return s;
-}
-
 CgiProcess::CgiProcess(const std::string& path, const std::vector<std::string>& args,
                         const std::map<std::string, std::string>& env,
                         const std::string& input, const std::string& working_dir)
@@ -229,6 +224,20 @@ static inline bool isLineWS(char c) {
 	return c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
+static bool isIgnored(const std::string& name) {
+	/*
+	 * The HTTP server controls message framing and connection
+	 * management. These are not copied from CGI.
+	 */
+	return equalCI(name, "Content-Length") ||
+			equalCI(name, "Transfer-Encoding") ||
+			equalCI(name, "Connection") ||
+			equalCI(name, "Keep-Alive") ||
+			equalCI(name, "Upgrade") ||
+			equalCI(name, "TE") ||
+			equalCI(name, "Trailer");
+}
+
 // trims directly against the buffer first, so there's only one extraction
 // (already trimmed) instead of one to pull the raw line out and another
 // inside trim()
@@ -279,7 +288,8 @@ bool CgiProcess::_consumeHeaderLine(std::size_t line_len) {
 	if (key_lower == "location")
 		_has_location = true;
 
-	_headers[key] = value;
+	if (!isIgnored(key))
+		_headers[key] = value;
 	return false;
 
 }
@@ -444,7 +454,7 @@ CGIResult CgiProcess::result() const {
         if (colon == std::string::npos) continue;
         std::string key = trim(line.substr(0, colon));
         std::string val = trim(line.substr(colon+1));
-        std::string key_l = to_lower(key);
+        std::string key_l = tolowerASCII(key);
         res.headers[key_l] = val;
         if (key_l == "status") {
             std::istringstream s2(val);
