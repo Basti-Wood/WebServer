@@ -703,7 +703,7 @@ Dispatcher& Dispatcher::instance(void) {
 // COMPLETE,				X
 // ERROR					✓
 
-void Dispatcher::request(Client& client) {
+void Dispatcher::handleRequest(Client& client) {
 
 	StatusCode status_code = NO_STATUS;
 
@@ -713,11 +713,12 @@ void Dispatcher::request(Client& client) {
 	switch (request.parsing.state) {
 	case HTTPRequest::ERROR:
 		client.markForTermination();
+		buildErrorResponse(request.parsing.error_cause,
+						   request.resolved.location,
+						   request.headers_only,
+						   response);
 		client.setState(Client::PENDING_RESPONSE);
-		return errorPage(request.resolved.location,
-						 response,
-						 request.headers_only,
-						 request.parsing.error_cause);
+		return;
 	case HTTPRequest::COMPLETE:
 		if (request.requires_CGI) {
 			status_code = handleCGI(request, response, client.getConfig());
@@ -773,20 +774,20 @@ void Dispatcher::request(Client& client) {
 	} else if (status_code == PAYLOAD_TOO_LARGE) {
 		client.blockFromReceiving();
 	}
-	errorPage(request.resolved.location,
-			  response,
-			  request.headers_only,
-			  status_code);
+	buildErrorResponse(status_code,
+					   request.resolved.location,
+					   request.headers_only,
+					   response);
 
 	client.setState(Client::PENDING_RESPONSE);
 	return;
 
 }
 
-void Dispatcher::errorPage(const Config::Location* location,
-						   HTTPResponse& response,
-						   bool headers_only,
-						   const StatusCode& code) {
+void Dispatcher::buildErrorResponse(const StatusCode& code,
+									const Config::Location* location,
+									bool headers_only,
+									HTTPResponse& response) {
 
 	// Check location error_page first, then server error_page
 	std::string error_page_path;

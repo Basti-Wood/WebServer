@@ -12,6 +12,7 @@
 
 #include "../incs/Server.hpp"
 #include "../incs/Dispatcher.hpp"
+#include "../incs/SessionManager.hpp"
 #include "../incs/templates.hpp"
 #include "../incs/Logger.hpp"
 #include "../incs/utils.hpp"
@@ -315,24 +316,27 @@ void Server::handleEvents(void) {
 			++it;
 
 			if (immediate->second->isTimedOut()) {
-// DEBUG BEGIN
-				log.debug("Client fd_" + i2a(immediate->first)
-				+ " idle time: " + i2a(immediate->second->getIdleTime()) + "s");
-// DEBUG END
-				log.warn("Client fd_" + i2a(immediate->first) + " timed out");
 
-				if (immediate->second->getState() == Client::RECEIVING_HEADERS) {
-					immediate->second->setState(Client::PENDING_RESPONSE);
-					immediate->second->pushResponse();
-					dispatch.errorPage(immediate->second->getCurrentRequest().resolved.location,
-									   immediate->second->getCurrentResponse(),
-									   immediate->second->getCurrentRequest().headers_only,
-									   REQUEST_TIMEOUT);
-					immediate->second->popRequest();
-					if (!setWRONLYInterest(immediate->first)) {
+				int fd = immediate->first;
+				Client& client = *immediate->second;
+// DEBUG BEGIN
+				log.debug("Client fd_" + i2a(fd)
+				+ " idle time: " + i2a(client.getIdleTime()) + "s");
+// DEBUG END
+				log.warn("Client fd_" + i2a(fd) + " timed out");
+
+				if (client.getState() == Client::RECEIVING_HEADERS) {
+					client.pushResponse();
+					dispatcher.buildErrorResponse(REQUEST_TIMEOUT,
+												  client.getCurrentRequest().resolved.location,
+												  client.getCurrentRequest().headers_only,
+												  client.getCurrentResponse());
+					client.setState(Client::PENDING_RESPONSE);
+					client.popRequest();
+					if (!setWRONLYInterest(fd)) {
 						cleanUpClient(immediate);
 					} else {
-						immediate->second->markForTermination();
+						client.markForTermination();
 					}
 				} else {
 					cleanUpClient(immediate);
@@ -461,8 +465,13 @@ bool Server::handleSocketReadEvent(int fd) {
 	} else {
 
 		client.parseDataFromPeer();
+
+		if (client.getState() == Client::RETRIEVING_SESSION) {
+			session_manager.getSession(client);
+		}
+
 		if (client.getState() == Client::DISPATCHING) {
-			dispatch.request(client);
+			dispatcher.handleRequest(client);
 		}
 
 		if (client.getState() == Client::RECEIVING_BODY) {
@@ -472,7 +481,7 @@ bool Server::handleSocketReadEvent(int fd) {
 		// TODO Add CGI stuff
 
 		if (client.getState() == Client::PREPARING_RESPONSE) {
-			dispatch.request(client);
+			dispatcher.handleRequest(client);
 		}
 
 		if (client.getState() == Client::PENDING_RESPONSE) {

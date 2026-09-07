@@ -171,20 +171,23 @@ bool Client::isTimedOut(void) const {
 	case RECEIVING_HEADERS:
 		timeout = HEADER_TIMEOUT_SECONDS;
 		break;
+	 case RETRIEVING_SESSION:
+	 timeout = PROCESSING_TIMEOUT_SECONDS;
+	  break;
 	case RECEIVING_BODY:
 		timeout = BODY_TIMEOUT_SECONDS;
 		break;
 	case DISPATCHING:
-		timeout = DISPATCH_TIMEOUT_SECONDS;
+		timeout = PROCESSING_TIMEOUT_SECONDS;
 		break;
 	case PREPARING_RESPONSE:
-		timeout = DISPATCH_TIMEOUT_SECONDS;
+		timeout = PROCESSING_TIMEOUT_SECONDS;
 		break;
 	case AWAITING_CGI_OUTPUT:
-		timeout = DISPATCH_TIMEOUT_SECONDS;
+		timeout = PROCESSING_TIMEOUT_SECONDS;
 		break;
 	case PENDING_RESPONSE:
-		timeout = DISPATCH_TIMEOUT_SECONDS;
+		timeout = PROCESSING_TIMEOUT_SECONDS;
 		break;
 	case SENDING_HEADERS:
 		timeout = HEADER_TIMEOUT_SECONDS;
@@ -334,7 +337,7 @@ void Client::parseDataFromPeer(void) {
 			break;
 		case HTTPRequest::RESOLVING_ROUTE:
 			log.info("All HTTP request headers received");
-			setState(Client::DISPATCHING);
+			setState(Client::RETRIEVING_SESSION);
 			if (_instream.data.size() != BUFFER_SIZE) {
 				_instream.data.resize(BUFFER_SIZE);
 			}

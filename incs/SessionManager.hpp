@@ -14,13 +14,33 @@
 #define SESSION_MANAGER_HPP
 
 #include "Session.hpp"
+#include "Client.hpp"
 #include <string>
 #include <map>
 
+#define session_manager SessionManager::instance()
+
 class SessionManager {
 
+public:
+
+	static SessionManager&				instance(void);
+
+	void								getSession(Client& client);
+
+	void								setAttribute(const std::string& session_id,
+													 const std::string& attribute);
+
 private:
-	std::map<std::string, Session> sessions;
+
+	SessionManager(void);
+	~SessionManager(void);
+	SessionManager(const SessionManager& other);
+	SessionManager& operator = (const SessionManager& other);
+
+	static const unsigned short			SESSION_ID_BYTE_WIDTH = 7;
+
+	std::map<std::string, Session*>		_sessions;
 
 };
 

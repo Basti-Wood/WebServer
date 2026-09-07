@@ -131,10 +131,13 @@ void dumpRequest(const HTTPRequest* request) {
 		log.debug("Content-Type:\t" + *type);
 	const std::string* disposition = request->getHeader("content-disposition");
 	if (disposition != NULL)
-		log.debug("Content-Type:\t" + *disposition);
+		log.debug("Content-Disposition:\t" + *disposition);
 	const std::string* content_length = request->getHeader("content-length");
 	if (content_length != NULL)
 		log.debug("Content-Length:\t" + *content_length);
+	const std::string* cookie = request->getHeader("cookie");
+	if (cookie != NULL)
+		log.debug("Cookie:\t\t" + *cookie);
 }
 // DEBUG END
 
@@ -222,11 +225,11 @@ std::string unquote(const std::string& str) {
 	return str;
 }
 
-std::string randomHexString(std::size_t width) {
+std::string randomHexString(std::size_t byte_width) {
 
 	static const char hex[] = "0123456789abcdef";
 
-	unsigned char* bytes = new unsigned char[width];
+	unsigned char* bytes = new unsigned char[byte_width];
 
 	try {
 		std::ifstream urandom("/dev/urandom", std::ios::in | std::ios::binary);
@@ -235,16 +238,16 @@ std::string randomHexString(std::size_t width) {
 			throw std::runtime_error("cannot open /dev/urandom");
 		}
 
-		urandom.read(reinterpret_cast<char*>(bytes), static_cast<std::streamsize>(width));
+		urandom.read(reinterpret_cast<char*>(bytes), static_cast<std::streamsize>(byte_width));
 
-		if (urandom.gcount() != static_cast<std::streamsize>(width)) {
+		if (urandom.gcount() != static_cast<std::streamsize>(byte_width)) {
 			throw std::runtime_error("cannot read /dev/urandom");
 		}
 
 		std::string result;
-		result.reserve(width * 2);
+		result.reserve(byte_width * 2);
 
-		for (std::size_t i = 0; i < width; ++i) {
+		for (std::size_t i = 0; i < byte_width; ++i) {
 			result += hex[bytes[i] >> 4];
 			result += hex[bytes[i] & 0x0f];
 		}
@@ -254,8 +257,12 @@ std::string randomHexString(std::size_t width) {
 	}
 	catch (std::exception& e) {
 		delete [] bytes;
-		log.error("hexgen: " + std::string(e.what()));
-		return i2a(std::time(NULL) * errno == 0 ? 1 : errno);
+		log.error("hexgen: " + std::string(e.what()) + ". Falling back to std::rand");
+		std::string unique_id;
+		while (unique_id.empty() || unique_id.size() < byte_width * 2) {
+			unique_id += i2a(std::rand());
+		}
+		return unique_id;
 	}
 }
 
@@ -293,7 +300,7 @@ void createFile(HTTPRequest& request) {
 	std::time_t timestamp = std::time(NULL);
 	do {
 		try {
-			suffix = randomHexString(5);
+			suffix = randomHexString(TEMPORARY_SUFFIX_BYTE_WIDTH);
 		} catch (std::exception& e) {
 			log.warn("random hex string generator: " + std::string(e.what()));
 			std::stringstream oss;
@@ -352,7 +359,7 @@ void promoteFile(HTTPRequest& request) {
 	std::string suffix;
 	std::time_t timestamp = std::time(NULL);
 	try {
-		suffix = randomHexString(7);
+		suffix = randomHexString(SUFFIX_BYTE_WIDTH);
 	} catch (std::exception& e) {
 		log.warn("random hex string generator: " + std::string(e.what()));
 		std::stringstream oss;

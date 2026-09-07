@@ -19,11 +19,15 @@ SRCS_DIR	=	./srcs/
 OBJS_DIR	=	./objs/
 INCS_DIR	=	./incs/
 
-SRCS		=	main.cpp Config.cpp ConfigLoader.cpp Buffer.cpp Server.cpp \
-			Client.cpp HTTPRequest.cpp HTTPRequestParser.cpp HTTPGrammar.cpp \
-			HTTPParameters.cpp HTTPContentType.cpp HTTPContentDisposition.cpp \
-			HTTPResponse.cpp Dispatcher.cpp Logger.cpp utils.cpp \
-			CgiProcess.cpp CgiEnv.cpp CgiHandler.cpp HTTPCookie.cpp
+SRCS		=	main.cpp Config.cpp ConfigLoader.cpp \
+			Buffer.cpp Server.cpp Client.cpp \
+			HTTPRequest.cpp HTTPRequestParser.cpp \
+			HTTPGrammar.cpp HTTPParameters.cpp \
+			HTTPContentType.cpp HTTPContentDisposition.cpp \
+			HTTPCookie.cpp Session.cpp SessionManager.cpp \
+			HTTPResponse.cpp Dispatcher.cpp \
+			CgiProcess.cpp CgiEnv.cpp CgiHandler.cpp \
+			Logger.cpp utils.cpp
 
 OBJS		=	$(addprefix $(OBJS_DIR), $(SRCS:.cpp=.o))
 

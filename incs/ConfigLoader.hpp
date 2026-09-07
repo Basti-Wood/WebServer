@@ -26,7 +26,7 @@
 // #include <typeinfo>
 #include <sys/stat.h>
 
-#define load ConfigLoader::instance()
+#define load ConfigLoader::instance().loadConfig
 
 class ConfigLoader {
 
@@ -34,9 +34,7 @@ public:
 
 	static ConfigLoader&						instance(void);
 
-	void										config(const std::string& config_file);
-
-	Method										extractMethod(const std::string& name);
+	void										loadConfig(const std::string& config_file);
 
 	typedef void (ConfigLoader::*locationDirectiveHandler) (const std::string& val,
 													  Config::Location& loc);

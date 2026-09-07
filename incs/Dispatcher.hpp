@@ -19,7 +19,7 @@
 #include "Client.hpp"
 // #include "utils.hpp"
 
-#define dispatch Dispatcher::instance()
+#define dispatcher Dispatcher::instance()
 
 class Dispatcher {
 
@@ -27,11 +27,11 @@ public:
 
 	static Dispatcher&					instance(void);
 
-	void								request(Client& client);
-	void								errorPage(const Config::Location* location,
-												  HTTPResponse& response,
-												  bool headers_only,
-												  const StatusCode& code);
+	void								handleRequest(Client& client);
+	void								buildErrorResponse(const StatusCode& code,
+														   const Config::Location* location,
+														   bool headers_only,
+														   HTTPResponse& response);
 
 	static const Config::Location*		resolveLocation(const std::vector<Config::Location>& locations,
 														const std::string& requested_location_path);
