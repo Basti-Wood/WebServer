@@ -19,6 +19,9 @@
 // #include <cstddef>
 #include <sys/epoll.h>
 
+static const short TEMPORARY_SUFFIX_BYTE_WIDTH = 5;
+static const short SUFFIX_BYTE_WIDTH = 7;
+
 // DEBUG BEGIN
 static const short STOP = -2;
 void			warnHighEventLoad(int nfds, int max_capacity);

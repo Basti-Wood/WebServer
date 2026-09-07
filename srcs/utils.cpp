@@ -297,7 +297,7 @@ void createFile(HTTPRequest& request) {
 	std::time_t timestamp = std::time(NULL);
 	do {
 		try {
-			suffix = randomHexString(5);
+			suffix = randomHexString(TEMPORARY_SUFFIX_BYTE_WIDTH);
 		} catch (std::exception& e) {
 			log.warn("random hex string generator: " + std::string(e.what()));
 			std::stringstream oss;
@@ -356,7 +356,7 @@ void promoteFile(HTTPRequest& request) {
 	std::string suffix;
 	std::time_t timestamp = std::time(NULL);
 	try {
-		suffix = randomHexString(7);
+		suffix = randomHexString(SUFFIX_BYTE_WIDTH);
 	} catch (std::exception& e) {
 		log.warn("random hex string generator: " + std::string(e.what()));
 		std::stringstream oss;
