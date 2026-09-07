@@ -178,7 +178,10 @@ void CgiProcess::writeStdin() {
 
 	ssize_t written = _instream.flushData(stdinFd(), true);
 
-	if (written == -1 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+	// poll() already told us this fd is ready; treat any -1 as fatal,
+	// same as Server::handleSocketReadEvent() does for sockets. Not
+	// allowed to branch on errno's value to decide what to do next.
+	if (written == -1) {
 		_state = ERROR;
 		return;
 	}
@@ -206,7 +209,7 @@ void CgiProcess::readStdout() {
 
 	ssize_t got = _outstream.fetchData(stdoutFd(), true);
 
-	if (got == -1 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+	if (got == -1) {
 		_state = ERROR;
 		return;
 	}
@@ -249,6 +252,17 @@ bool CgiProcess::_consumeHeaderLine(std::size_t line_len) {
 		return false;
 
 	std::string key = line.substr(0, colon);
+
+	// field-name is a token: no whitespace or separators allowed, so this
+	// also catches "Content-Type : text/plain" (space before the colon
+	// ends up inside key, and ' ' isn't a tchar)
+	for (std::size_t i = 0; i < key.size(); ++i) {
+		if (!isTChar(key[i])) {
+			_state = ERROR;
+			return false;
+		}
+	}
+
 	std::string value = trim(line.substr(colon + 1));
 	std::string key_lower = tolowerASCII(key);
 
@@ -281,7 +295,7 @@ void CgiProcess::_consumeAvailableOutput() {
 	}
 
 	ssize_t nl;
-	while (!_headers_done && (nl = _outstream.find(http::LF)) != -1) {
+	while (!_headers_done && _state != ERROR && (nl = _outstream.find(http::LF)) != -1) {
 
 		std::size_t line_len = static_cast<std::size_t>(nl);
 		bool blank = _consumeHeaderLine(line_len);
@@ -304,6 +318,14 @@ void CgiProcess::_consumeAvailableOutput() {
 // headers/body/status were already parsed incrementally as bytes arrived
 // (see _consumeAvailableOutput()), this just transfers them onto response
 void CgiProcess::buildResponse(HTTPResponse& response, bool headers_only) const {
+
+    // a broken pipe read/write, or a malformed header line (bad field-name
+    // char), lands here instead of COMPLETE
+    if (_state == ERROR) {
+        response.setStatus(INTERNAL_SERVER_ERROR);
+        response.setBody("", HEAP, "", headers_only);
+        return;
+    }
 
     if (_state != COMPLETE)
         return;
