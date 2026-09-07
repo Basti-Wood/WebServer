@@ -67,6 +67,9 @@ public:
 
     CGIResult result() const;
 
+    // only does anything once _state == COMPLETE
+    void buildResponse(HTTPResponse& response, bool headers_only) const;
+
 private:
     CgiProcess(const CgiProcess&);
     CgiProcess& operator=(const CgiProcess&);

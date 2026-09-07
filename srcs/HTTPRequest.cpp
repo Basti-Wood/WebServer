@@ -11,7 +11,6 @@
 /* ************************************************************************** */
 
 #include "../incs/HTTPRequest.hpp"
-#include "../incs/CgiHandler.hpp" // full CgiHandler type, needed to delete cgi_handler
 // #include "../incs/constexpr.hpp"
 // #include "../incs/templates.hpp"
 #include "../incs/Logger.hpp"
@@ -31,8 +30,8 @@
 HTTPRequest::HTTPRequest(const sockaddr_in* remote_socket, const sockaddr_in* server_socket) {
 	log.debug("HTTPRequest Constructor called");
 	cgi.remote_socket = *remote_socket;
-	cgi.remote_socket = *server_socket;
-	cgi_handler = NULL;
+	cgi.server_socket = *server_socket;
+	cgi_process = NULL;
 	headers_only = false;
 	is_multipart = false;
 	body_chunked = false;
@@ -48,7 +47,7 @@ HTTPRequest::HTTPRequest(const sockaddr_in* remote_socket, const sockaddr_in* se
 /*	@brief Destructor	*/
 HTTPRequest::~HTTPRequest(void) {
 	log.debug("HTTPRequest Destructor called");
-	delete cgi_handler;
+	delete cgi_process;
 	return;
 }
 
@@ -178,8 +177,8 @@ void HTTPRequest::reset(void) {
 	resolved.method = METHOD_COUNT;
 	resolved.domain = NULL;
 	resolved.location = NULL;
-	delete cgi_handler;
-	cgi_handler = NULL;
+	delete cgi_process;
+	cgi_process = NULL;
 	headers_only = false;
 	created_file = false;
 	_method = METHOD_COUNT;

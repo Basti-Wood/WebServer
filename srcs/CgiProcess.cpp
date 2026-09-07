@@ -36,6 +36,11 @@ CgiProcess::CgiProcess(const std::string& path, const std::vector<std::string>& 
     _in_pipe[0] = -1; _in_pipe[1] = -1;
     _out_pipe[0] = -1; _out_pipe[1] = -1;
 
+    if (!input.empty()) {
+        _instream.data.assign(input.begin(), input.end());
+        _instream.end = input.size();
+    }
+
     if (pipe(_in_pipe) == -1)
         return;
     if (pipe(_out_pipe) == -1) {
@@ -293,6 +298,28 @@ void CgiProcess::_consumeAvailableOutput() {
 	}
 
 	_outstream.compact(); // free up what we already committed past
+
+}
+
+// headers/body/status were already parsed incrementally as bytes arrived
+// (see _consumeAvailableOutput()), this just transfers them onto response
+void CgiProcess::buildResponse(HTTPResponse& response, bool headers_only) const {
+
+    if (_state != COMPLETE)
+        return;
+
+    for (std::map<std::string, std::string>::const_iterator it = _headers.begin();
+         it != _headers.end(); ++it) {
+        response.setHeader(it->first, it->second);
+    }
+
+    StatusCode status = _status;
+    // CGI/1.1: Location with no Status means client redirect
+    if (_has_location && !_has_status)
+        status = FOUND;
+
+    response.setStatus(status);
+    response.setBody(_body, HEAP, _content_type, headers_only);
 
 }
 
