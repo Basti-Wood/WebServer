@@ -41,8 +41,8 @@ public:
     bool  valid() const; // false if pipe() failed
     bool  spawn();        // fork()+execve()'s using the already-open pipes; false on failure
     pid_t pid()   const;
-    const int   stdinFd(); // -1 once the write end is closed
-    const int   stdoutFd() const; // -1 once the read end is closed
+    int   stdinFd(); // -1 once the write end is closed
+    int   stdoutFd() const; // -1 once the read end is closed
 
     // closes the fd and sets it to -1, same as handleWritable()/
     // handleReadable() do once done, so wantsWrite()/wantsRead()/isDone()

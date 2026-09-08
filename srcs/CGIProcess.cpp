@@ -132,8 +132,8 @@ CGIProcess::~CGIProcess() {
 
 bool  CGIProcess::valid()     const { return _pipes_open; }
 pid_t CGIProcess::pid()       const { return _pid; }
-const int   CGIProcess::stdinFd()         { return _stdin_fd; }
-const int   CGIProcess::stdoutFd()  const { return _stdout_fd; }
+int   CGIProcess::stdinFd()         { return _stdin_fd; }
+int   CGIProcess::stdoutFd()  const { return _stdout_fd; }
 
 void CGIProcess::closeStdin() {
 	if (_stdin_fd != -1) {

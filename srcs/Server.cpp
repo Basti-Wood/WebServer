@@ -571,6 +571,7 @@ void Server::handleSocketWriteEvent(int fd, std::map<int, Client*>::iterator it)
 
 void Server::handlePipeWriteEvent(int fd, std::map<int, Client*>::iterator it) {
 
+	(void)fd;
 	Client& client = *it->second;
 
 	if (client.getState() == Client::RECEIVING_BODY) {
