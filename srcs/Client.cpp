@@ -85,6 +85,9 @@ Client::~Client(void) {
 			}
 		}
 	}
+
+	delete cgi_process;
+
 	while (!_request_queue.empty()) popRequest();
 	 _request_queue.clear();
 	while (!_response_queue.empty()) popResponse();
@@ -553,6 +556,7 @@ void Client::markForTermination(void) {
 
 void Client::reset(void) {
 
+	delete cgi_process;
 	cgi_process = NULL;
 	_state = IDLE;
 	_blocked_from_receiving = false;

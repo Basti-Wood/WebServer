@@ -96,8 +96,7 @@ StatusCode setUpCGI(Client& client) {
 														   *request.resolved.location,
 														   request.resolved.filepath);
 
-	CGIProcess cgi_process(request.cgi.binary_path, cgi_args, env, working_dir);
-	client.cgi_process = &cgi_process;
+	client.cgi_process = new CGIProcess(request.cgi.binary_path, cgi_args, env, working_dir);
 
 	if (!client.cgi_process->valid()) {
 		log.error("cgi: failed to open pipes for " + request.cgi.binary_path);

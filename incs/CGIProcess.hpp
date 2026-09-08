@@ -1,11 +1,11 @@
 #pragma once
-#include "Buffer.hpp"
 #include "HTTPResponse.hpp"
+#include "Buffer.hpp"
 #include <string>
 #include <vector>
 #include <map>
-#include <sys/types.h>
 #include <ctime>
+#include <sys/types.h>
 
 // Result from running a CGI program
 struct CGIResult {

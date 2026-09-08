@@ -1,6 +1,6 @@
 #include "../incs/CGIProcess.hpp"
-#include "../incs/utils.hpp"
 #include "../incs/constexpr.hpp"
+#include "../incs/utils.hpp"
 
 #include <unistd.h>
 #include <sys/types.h>
