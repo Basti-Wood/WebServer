@@ -860,7 +860,7 @@ bool RequestParser::_parseBody(const Buffer& buffer, HTTPRequest& request) {
 
 		if (n == 0) return true;
 
-		ssize_t bytes_consumed = write(request.cgi.std_in, &buffer.data[buffer.begin], n);
+		ssize_t bytes_consumed = write(request.cgi_process->stdinFd(), &buffer.data[buffer.begin], n);
 		if (bytes_consumed < 0) {
 			throw std::runtime_error("write: " + std::string(strerror(errno)));
 		}

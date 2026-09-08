@@ -1,5 +1,4 @@
 #include "../incs/CgiEnv.hpp"
-#include "../incs/utils.hpp"
 #include <sstream>
 #include <cstdlib>
 #include <arpa/inet.h>
@@ -27,7 +26,6 @@ static std::string method_to_string(const Method& method) {
 }
 
 std::map<std::string,std::string> build_cgi_env(const HTTPRequest& req,
-                                               const Config::Socket& socket,
                                                const Config::Domain& domain,
                                                const Config::Location& loc,
                                                const std::string& script_filename)
@@ -44,7 +42,7 @@ std::map<std::string,std::string> build_cgi_env(const HTTPRequest& req,
     env["QUERY_STRING"] = req.getQuery();
     env["DOCUMENT_ROOT"] = domain.root;
     env["SERVER_NAME"] = domain.names[0]; // extractDomainNames() throws on empty, always non-empty here
-    env["SERVER_PORT"] = to_string_int(socket.port);
+    env["SERVER_PORT"] = to_string_int(req.cgi.server_socket.sin_port);
 
     if (!req.cgi.path_info.empty()) {
         env["PATH_INFO"] = req.cgi.path_info;

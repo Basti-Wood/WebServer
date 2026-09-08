@@ -503,14 +503,15 @@ static StatusCode routeRequest(HTTPRequest& request,
 
 	// Match CGI extensions
 	if (request.requires_CGI) {
-		// TODO we need to put setting up all things CGI here! The cgi pipes need to be ready to be written to during READING_BODY
+		// TEST we need to put setting up all things CGI here! The cgi pipes need to be ready to be written to during READING_BODY
+		StatusCode status_code = handleCGI(request, response);
 		if (request.body.size != 0 ||
 			request.body_chunked == true) {
 			request.parsing.state = HTTPRequest::READING_BODY;
 		} else {
 			request.parsing.state = HTTPRequest::COMPLETE;
 		}
-		return NO_STATUS;
+		return status_code;
 
 	// Check if request path exists as static file in `root`
 	} else if (isRegularFile(request.resolved.filepath)) {
@@ -721,13 +722,12 @@ void Dispatcher::handleRequest(Client& client) {
 		return;
 	case HTTPRequest::COMPLETE:
 		if (request.requires_CGI) {
-			status_code = handleCGI(request, response, client.getConfig());
-			if (status_code < BAD_REQUEST) {
-				// spawned, not done -- wait for its output instead of
-				// treating this like a ready-to-send response
-				client.setState(Client::AWAITING_CGI_OUTPUT);
-				return;
-			}
+			// TODO?
+			// WITH-body CGI request finished writing to the CGI stdin.
+			// I GUESS only thing to do here is putting client state to
+			// AWAITING_CGI_OUTPUT?
+			client.setState(Client::AWAITING_CGI_OUTPUT);
+			return;
 		} else if (request.resolved.method == PUT) {
 			status_code = handlePUT(request, response);
 		} else if (request.resolved.method == POST) {

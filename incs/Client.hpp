@@ -102,7 +102,7 @@ public:
 	bool							markedForTermination() const;
 	bool							isTimedOut(void) const;
 
-	ssize_t							queueIncomingData(int fd, bool from_pipe = false);
+	ssize_t							queueIncomingData(int fd);
 
 	void							parseDataFromPeer(void);		// build request
 	void							queueOutgoingData(void);		// build response

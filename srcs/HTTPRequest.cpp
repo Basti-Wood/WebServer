@@ -48,7 +48,6 @@ HTTPRequest::HTTPRequest(const sockaddr_in* remote_socket, const sockaddr_in* se
 /*	@brief Destructor	*/
 HTTPRequest::~HTTPRequest(void) {
 	log.debug("HTTPRequest Destructor called");
-	delete cgi_process;
 	return;
 }
 
@@ -179,7 +178,6 @@ void HTTPRequest::reset(void) {
 	resolved.method = METHOD_COUNT;
 	resolved.domain = NULL;
 	resolved.location = NULL;
-	delete cgi_process;
 	cgi_process = NULL;
 	headers_only = false;
 	created_file = false;

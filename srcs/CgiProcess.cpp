@@ -12,7 +12,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <vector>
-#include <algorithm>
 #include <sstream>
 
 static const int CGI_TIMEOUT_S = 10;
@@ -141,8 +140,8 @@ CgiProcess::~CgiProcess() {
 
 bool  CgiProcess::valid()     const { return _pipes_open; }
 pid_t CgiProcess::pid()       const { return _pid; }
-int   CgiProcess::stdinFd()   const { return _stdin_fd; }
-int   CgiProcess::stdoutFd()  const { return _stdout_fd; }
+const int   CgiProcess::stdinFd()         { return _stdin_fd; }
+const int   CgiProcess::stdoutFd()  const { return _stdout_fd; }
 
 void CgiProcess::closeStdin() {
 	if (_stdin_fd != -1) {
@@ -157,6 +156,13 @@ void CgiProcess::closeStdout() {
 		_stdout_fd = -1;
 	}
 }
+
+
+ssize_t CgiProcess::queueIncomingData(int fd) {
+	ssize_t bytes_read = fetchNbuff(fd, _outstream);
+	return bytes_read;
+}
+
 
 // same shape as handleWritable(), just using _instream
 // of the raw _input string

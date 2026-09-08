@@ -34,8 +34,7 @@ static std::string readCgiInput(const HTTPRequest& request) {
 
 }
 
-StatusCode handleCGI(HTTPRequest& request, HTTPResponse& response,
-					 const Config::Socket& socket) {
+StatusCode handleCGI(HTTPRequest& request, HTTPResponse& response) {
 
 	(void)response; // filled in later, by CgiProcess::buildResponse()
 
@@ -43,12 +42,13 @@ StatusCode handleCGI(HTTPRequest& request, HTTPResponse& response,
 	std::vector<std::string> cgi_args = buildCgiArgs(request);
 	std::string working_dir = request.resolved.filepath.substr(0, request.resolved.filepath.find_last_of('/'));
 
-	std::map<std::string, std::string> env = build_cgi_env(request, socket,
-															*request.resolved.domain,
-															*request.resolved.location,
-															request.resolved.filepath);
+	std::map<std::string, std::string> env = build_cgi_env(request,
+														   *request.resolved.domain,
+														   *request.resolved.location,
+														   request.resolved.filepath);
 
-	request.cgi_process = new CgiProcess(request.cgi.binary_path, cgi_args, env, cgi_input, working_dir);
+	CgiProcess cgi_process(request.cgi.binary_path, cgi_args, env, cgi_input, working_dir);
+	request.cgi_process = &cgi_process;
 
 	if (!request.cgi_process->valid()) {
 		log.error("cgi: failed to open pipes for " + request.cgi.binary_path);

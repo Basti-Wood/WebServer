@@ -209,14 +209,9 @@ bool Client::isTimedOut(void) const {
 
 }
 
-ssize_t Client::queueIncomingData(int fd, bool from_pipe) {
-
-	Buffer& buffer = from_pipe ? _pipestream
-							   : _instream;
-
-	ssize_t bytes_read = buffer.fetchData(fd);
+ssize_t Client::queueIncomingData(int fd) {
+	ssize_t bytes_read = fetchNbuff(fd, _instream);
 	if (bytes_read > 0) _last_event = std::time(NULL);
-
 	return bytes_read;
 }
 

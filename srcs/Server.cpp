@@ -269,29 +269,29 @@ void Server::handleEvents(void) {
 				acceptConnectRequest(listen_socket->first, listen_socket->second);
 			}
 
-			std::map<int, Client*>::const_iterator client_socket = _clients.find(fd);
+			std::map<int, Client*>::iterator client_socket = _clients.find(fd);
 			if (client_socket != _clients.end()) {
 
 				if (events & EPOLLERR)
-					handleSocketError(fd);
+					handleSocketError(fd, client_socket);
 				else if (events & EPOLLHUP)
-					handleSocketHangup(fd);
+					cleanUpClient(client_socket);
 				else if (events & EPOLLRDHUP)
-					handleRemoteHangup(fd);
+					cleanUpClient(client_socket);
 				else if (events & EPOLLIN)
-					tcp_peer_alive = handleSocketReadEvent(fd);
+					tcp_peer_alive = handleSocketReadEvent(fd, client_socket);
 
 				if (tcp_peer_alive && (events & EPOLLOUT))
-					handleSocketWriteEvent(fd);
+					handleSocketWriteEvent(fd, client_socket);
 			}
 
-			std::map<int, Client*>::const_iterator script_output = _outputs.find(fd);
+			std::map<int, Owners>::iterator script_output = _outputs.find(fd);
 			if (script_output != _outputs.end()) {
 
 				if (events & EPOLLIN)
-					handlePipeReadEvent(fd);
+					handlePipeReadEvent(fd, script_output);
 				else if (events & EPOLLOUT)
-					handlePipeWriteEvent(fd);
+					handlePipeWriteEvent(fd, script_output);
 
 				// TODO think if we should care about EPOLLERR (read end closed)
 				// and EPOLLHUP (write end closed / read end returns EOF anyway)
@@ -387,7 +387,7 @@ void Server::acceptConnectRequest(int listen_fd, ListeningSocket socket) {
 
 }
 
-void Server::handleSocketError(int fd) {
+void Server::handleSocketError(int fd, std::map<int, Client*>::iterator it) {
 
 	int error = 0;
 	socklen_t len = sizeof(error);
@@ -398,56 +398,56 @@ void Server::handleSocketError(int fd) {
 		log.error("socket error: " + std::string(strerror(error)));
 	}
 
-	std::map<int, Client*>::iterator it = _clients.find(fd);
-
-	if (it == _clients.end() || it->second == NULL) {
-		// throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
-		log.warn("client lookup:: " + std::string(NFIND_CLIENT));
-	}
-
-	cleanUpClient(it);
-	return;
-
-}
-
-void Server::handleSocketHangup(int fd) {
-
-	std::map<int, Client*>::iterator it = _clients.find(fd);
-
-	if (it == _clients.end() || it->second == NULL) {
-		// throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
-		log.warn("client lookup:: " + std::string(NFIND_CLIENT));
-	}
+	// std::map<int, Client*>::iterator it = _clients.find(fd);
+ //
+	// if (it == _clients.end() || it->second == NULL) {
+	// 	// throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
+	// 	log.warn("client lookup:: " + std::string(NFIND_CLIENT));
+	// }
 
 	cleanUpClient(it);
 	return;
 
 }
 
-void Server::handleRemoteHangup(int fd) {
+// void Server::handleSocketHangup(int fd) {
+//
+// 	std::map<int, Client*>::iterator it = _clients.find(fd);
+//
+// 	if (it == _clients.end() || it->second == NULL) {
+// 		// throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
+// 		log.warn("client lookup:: " + std::string(NFIND_CLIENT));
+// 	}
+//
+// 	cleanUpClient(it);
+// 	return;
+//
+// }
 
-	std::map<int, Client*>::iterator it = _clients.find(fd);
+// void Server::handleRemoteHangup(int fd) {
+//
+// 	std::map<int, Client*>::iterator it = _clients.find(fd);
+//
+// 	if (it == _clients.end() || it->second == NULL) {
+// 		// throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
+// 		log.warn("client lookup:: " + std::string(NFIND_CLIENT));
+// 	}
+//
+// 	cleanUpClient(it);
+// 	return;
+//
+// }
 
-	if (it == _clients.end() || it->second == NULL) {
-		// throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
-		log.warn("client lookup:: " + std::string(NFIND_CLIENT));
-	}
+bool Server::handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it) {
 
-	cleanUpClient(it);
-	return;
-
-}
-
-bool Server::handleSocketReadEvent(int fd) {
-
-	std::map<int, Client*>::iterator it = _clients.find(fd);
-
-	if (it == _clients.end() || it->second == NULL) {
-		// throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
-		log.warn("client lookup:: " + std::string(NFIND_CLIENT));
-		return false;
-	}
-
+	// std::map<int, Client*>::iterator it = _clients.find(fd);
+ //
+	// if (it == _clients.end() || it->second == NULL) {
+	// 	// throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
+	// 	log.warn("client lookup:: " + std::string(NFIND_CLIENT));
+	// 	return false;
+	// }
+ //
 	Client& client = *it->second;
 	ssize_t bytes_received = client.queueIncomingData(fd);
 
@@ -474,11 +474,15 @@ bool Server::handleSocketReadEvent(int fd) {
 			dispatcher.handleRequest(client);
 		}
 
+		// TODO
+		// register pipes and add them to _outputs
+
 		if (client.getState() == Client::RECEIVING_BODY) {
 			client.parseDataFromPeer();
 		}
 
-		// TODO Add CGI stuff
+		// TODO
+		// go back to dispatcher to have client state set to AWAITING_CGI_OUTPUT???
 
 		if (client.getState() == Client::PREPARING_RESPONSE) {
 			dispatcher.handleRequest(client);
@@ -504,32 +508,35 @@ bool Server::handleSocketReadEvent(int fd) {
 	}
 }
 
-void Server::handlePipeReadEvent(int fd) {
+void Server::handlePipeReadEvent(int fd, std::map<int, Owners>::iterator it) {
 
-	std::map<int, Client*>::iterator it = _clients.find(fd);
-	if (it == _clients.end() || it->second == NULL) {
-	 // throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
-	 log.warn("client lookup:: " + std::string(NFIND_CLIENT));
-	 return;
-	}
-
-	Client& client = *it->second;
-	if (client.getState() == Client::AWAITING_CGI_OUTPUT) {
-		client.queueIncomingData(fd, true);
+	// std::map<int, ScriptOutput*>::iterator it = _outputs.find(fd);
+	// if (it == _outputs.end() || it->second == NULL) {
+	//  // throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
+	//  log.warn("CGI process lookup:: " + std::string(NFIND_SCRIPT));
+	//  return;
+	// }
+ //
+	// CgiProcess& script = *it->second;
+	// if (client.getState() == Client::AWAITING_CGI_OUTPUT) {
+		// script.queueIncomingData(fd);
+	// }
+	if (it->second.client->getState() == Client::AWAITING_CGI_OUTPUT) {
+		it->second.script->queueIncomingData(fd);
 	}
 
 	return;
 }
 
-void Server::handleSocketWriteEvent(int fd) {
+void Server::handleSocketWriteEvent(int fd, std::map<int, Client*>::iterator it) {
 
-	std::map<int, Client*>::iterator it = _clients.find(fd);
-
-	if (it == _clients.end() || it->second == NULL) {
-		// throw std::runtime_error("client lookup: " + std::string(NFIND_CLIENT));
-		log.warn("client lookup:: " + std::string(NFIND_CLIENT));
-		return;
-	}
+	// std::map<int, Client*>::iterator it = _clients.find(fd);
+ //
+	// if (it == _clients.end() || it->second == NULL) {
+	// 	// throw std::runtime_error("client lookup: " + std::string(NFIND_CLIENT));
+	// 	log.warn("client lookup:: " + std::string(NFIND_CLIENT));
+	// 	return;
+	// }
 
 	Client& client = *it->second;
 	if (client.getState() == Client::CONCLUDED ||
@@ -573,17 +580,10 @@ void Server::handleSocketWriteEvent(int fd) {
 	return;
 }
 
-void Server::handlePipeWriteEvent(int fd) {
+void Server::handlePipeWriteEvent(int fd, std::map<int, Owners>::iterator it) {
 
-	std::map<int, Client*>::iterator it = _clients.find(fd);
-	if (it == _clients.end() || it->second == NULL) {
-	 // throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
-	 log.warn("client lookup:: " + std::string(NFIND_CLIENT));
-	 return;
-   }
 
-	Client& client = *it->second;
-	if (client.getState() == Client::PREPARING_RESPONSE) {
+	if (it->second.client->getState() == Client::PREPARING_RESPONSE) {
 		// TODO have the CGI handler parse the CGI response and populate the response object
    }
    return;

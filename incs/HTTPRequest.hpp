@@ -13,17 +13,15 @@
 #ifndef HTTP_REQUEST_HPP
 #define HTTP_REQUEST_HPP
 
-// #include "Config.hpp"
-// #include "Buffer.hpp"
-#include "HTTPResponse.hpp"
 #include "HTTPParameters.hpp"
+#include "HTTPResponse.hpp"
 #include "CgiProcess.hpp"
 #include "Session.hpp"
-#include <netinet/in.h>
 #include <sstream>
 #include <string>
 #include <cstring>
 #include <cstddef>
+#include <netinet/in.h>
 
 class HTTPRequest {
 
@@ -64,6 +62,15 @@ public:
 		CRLF
 	};
 
+	struct Cookie {
+
+		std::string										name;
+		std::string										value;
+
+		Cookie(void) : name(""), value("") {}
+
+	};
+
 	struct ParsingContext {
 
 		State											state;
@@ -99,36 +106,18 @@ public:
 
 	};
 
-	struct Cookie {
+	struct ResolvedRoute {
 
-		std::string										name;
-		std::string										value;
+		Method											method;
+		const Config::Domain*							domain;
+		const Config::Location*							location;
+		std::string										filepath;
 
-		Cookie(void) : name(""), value("") {}
-
-	};
-
-	struct CGIContext {
-
-		sockaddr_in										remote_socket;
-		sockaddr_in										server_socket;
-
-		std::string										binary_path;
-		std::string										script_name;
-		std::string										path_info;
-
-		int												std_out;
-		int												std_in;
-
-		CGIContext(void)
-			:	binary_path(""),
-				script_name(""),
-				path_info(""),
-				std_out(-1),
-				std_in(-1) {
-			std::memset(&remote_socket, 0, sizeof(remote_socket));
-			std::memset(&server_socket, 0, sizeof(server_socket));
-		}
+		ResolvedRoute(void)
+			:	method(METHOD_COUNT),
+				domain(NULL),
+				location(NULL),
+				filepath("") {}
 
 	};
 
@@ -217,18 +206,22 @@ public:
 
 	};
 
-	struct ResolvedRoute {
+	struct CGIContext {
 
-		Method											method;
-		const Config::Domain*							domain;
-		const Config::Location*							location;
-		std::string										filepath;
+		sockaddr_in										remote_socket;
+		sockaddr_in										server_socket;
 
-		ResolvedRoute(void)
-			:	method(METHOD_COUNT),
-				domain(NULL),
-				location(NULL),
-				filepath("") {}
+		std::string										binary_path;
+		std::string										script_name;
+		std::string										path_info;
+
+		CGIContext(void)
+			:	binary_path(""),
+				script_name(""),
+				path_info("") {
+			std::memset(&remote_socket, 0, sizeof(remote_socket));
+			std::memset(&server_socket, 0, sizeof(server_socket));
+		}
 
 	};
 

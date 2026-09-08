@@ -13,6 +13,7 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
+#include "CgiProcess.hpp"
 #define server Server::instance()
 
 #include "Client.hpp"
@@ -23,13 +24,19 @@
 // #include <vector>
 // #include <map>
 
-# define INVALID_ADDR "No valid address string was provided for the specified \
+#define INVALID_ADDR "No valid address string was provided for the specified \
 address family."
-# define NFIND_CLIENT "Client not found."
+// #define NFIND_CLIENT "Client not found."
+// #define NFIND_SCRIPT "CGI process not found."
 
 struct ListeningSocket {
-	sockaddr_in					addr;
-	const Config::Socket*		conf;
+	sockaddr_in								addr;
+	const Config::Socket*					conf;
+};
+
+struct Owners {
+	Client*									client;
+	CgiProcess*								script;
 };
 
 class Server {
@@ -48,15 +55,15 @@ public:
 	void									prepareListeningPort(const Config::Socket& config);
 	void									handleEvents(void);
 	void									acceptConnectRequest(int fd, ListeningSocket socket);
-	void									handleSocketError(int fd);
-	void									handleSocketHangup(int fd);
-	void									handleRemoteHangup(int fd);
+	void									handleSocketError(int fd, std::map<int, Client*>::iterator it);
+	// void									handleSocketHangup(int fd);
+	// void									handleRemoteHangup(int fd);
 
-	bool									handleSocketReadEvent(int fd);
+	bool									handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it);
 
-	void									handlePipeReadEvent(int fd);
-	void									handleSocketWriteEvent(int fd);
-	void									handlePipeWriteEvent(int fd);
+	void									handlePipeReadEvent(int fd, std::map<int, Owners>::iterator it);
+	void									handleSocketWriteEvent(int fd, std::map<int, Client*>::iterator it);
+	void									handlePipeWriteEvent(int fd, std::map<int, Owners>::iterator it);
 
 	void									cleanUpAllRessources(void);
 	void									cleanUpClient(std::map<int, Client*>::iterator it);
@@ -78,7 +85,7 @@ private:
 	// std::map<int, const Config::Socket*>	_sockets;
 	std::map<int, ListeningSocket>			_sockets;
 	std::map<int, Client*>					_clients;
-	std::map<int, Client*>					_outputs;
+	std::map<int, Owners>					_outputs;
 
 	epoll_event								_events[MAX_EPOLL_EVENTS];
 

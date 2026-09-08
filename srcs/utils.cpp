@@ -393,6 +393,11 @@ void promoteFile(HTTPRequest& request) {
 
 }
 
+ssize_t fetchNbuff(int fd, Buffer& buffer) {
+	ssize_t bytes_read = buffer.fetchData(fd);
+	return bytes_read;
+}
+
 ssize_t buffNflush(std::istream& stream, Buffer& b, int fd, bool is_pipe) {
 
 	// Fill buffer if not saturated and stream has not reached EOF
