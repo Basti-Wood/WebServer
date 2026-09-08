@@ -15,7 +15,6 @@
 
 #include "HTTPParameters.hpp"
 #include "HTTPResponse.hpp"
-#include "CgiProcess.hpp"
 #include "Session.hpp"
 #include <sstream>
 #include <string>
@@ -237,8 +236,6 @@ public:
 	RequestBody											body;
 
 	CGIContext											cgi;
-
-	CgiProcess*											cgi_process; // owns the live CGI child while one is running (NULL otherwise)
 
 	bool												headers_only; // HEAD method
 	bool												requires_CGI;

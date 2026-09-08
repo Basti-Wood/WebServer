@@ -22,7 +22,7 @@ struct CGIResult {
 // registered the pipe fds with its own poll()/epoll(). Exposes the pipe ends
 // non-blocking so the caller can drive I/O only on readiness. No internal
 // blocking wait anywhere in this class.
-class CgiProcess {
+class CGIProcess {
 public:
     enum ScriptState {
         WRITING_PIPES,
@@ -32,12 +32,11 @@ public:
         ERROR
     };
 
-    CgiProcess(const std::string& path,
+    CGIProcess(const std::string& path,
                const std::vector<std::string>& args,
                const std::map<std::string, std::string>& env,
-               const std::string& input,
                const std::string& working_dir = "");
-    ~CgiProcess();
+    ~CGIProcess();
 
     bool  valid() const; // false if pipe() failed
     bool  spawn();        // fork()+execve()'s using the already-open pipes; false on failure
@@ -73,8 +72,8 @@ public:
     void buildResponse(HTTPResponse& response, bool headers_only) const;
 
 private:
-    CgiProcess(const CgiProcess&);
-    CgiProcess& operator=(const CgiProcess&);
+    CGIProcess(const CGIProcess&);
+    CGIProcess& operator=(const CGIProcess&);
 
     // parses the line sitting at _outstream.begin, line_len chars long
     // (not counting the '\n'), straight off the buffer -> _headers/etc.
@@ -98,9 +97,9 @@ private:
     pid_t       _pid;
     int         _stdin_fd;
     int         _stdout_fd;
-    std::string _input;
-    size_t      _input_offset;
-    std::string _output;
+    // std::string _input;
+    // size_t      _input_offset;
+    // std::string _output;
     bool        _reaped;
     int         _exit_code;
     time_t      _deadline;
@@ -119,11 +118,10 @@ private:
     std::string _body;
 };
 
-// Blocking convenience wrapper around CgiProcess for standalone/offline use
-// (tests). The live server drives a CgiProcess from its own epoll loop
+// Blocking convenience wrapper around CGIProcess for standalone/offline use
+// (tests). The live server drives a CGIProcess from its own epoll loop
 // instead of calling this.
 CGIResult run_cgi(const std::string& path,
                   const std::vector<std::string>& args,
                   const std::map<std::string, std::string>& env,
-                  const std::string& input,
                   const std::string& working_dir = "");

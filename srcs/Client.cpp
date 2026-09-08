@@ -23,6 +23,7 @@
 // #include <cstring>
 // #include <fcntl.h>
 #include <arpa/inet.h>
+#include <cstddef>
 
   //~~~~~~~~~~//
  /*  Public  */
@@ -30,7 +31,8 @@
 
 /*	@brief Constructor	*/
 Client::Client(const sockaddr_in socket, const Config::Socket* config)
-	:	_state(IDLE),
+	:	cgi_process(NULL),
+		_state(IDLE),
 		_blocked_from_receiving(false),
 		_marked_for_termination(false),
 		_config(config),
@@ -551,6 +553,7 @@ void Client::markForTermination(void) {
 
 void Client::reset(void) {
 
+	cgi_process = NULL;
 	_state = IDLE;
 	_blocked_from_receiving = false;
 	_marked_for_termination = false;

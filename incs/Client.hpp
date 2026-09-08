@@ -15,6 +15,7 @@
 
 #include "Config.hpp"
 #include "Buffer.hpp"
+#include "CGIProcess.hpp"
 #include "HTTPRequest.hpp"
 #include "HTTPResponse.hpp"
 #include <netinet/in.h>
@@ -69,6 +70,9 @@ public:
 		Response(void) {headers.clear();}
 
 	};
+
+	CGIProcess*						cgi_process; // owns the live CGI child while one is running (NULL otherwise)
+
 
 // DEBUG BEGIN
 	double							getIdleTime(void) const;

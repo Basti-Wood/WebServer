@@ -285,7 +285,7 @@ void Server::handleEvents(void) {
 					handleSocketWriteEvent(fd, client_socket);
 			}
 
-			std::map<int, Owners>::iterator script_output = _outputs.find(fd);
+			std::map<int, Client*>::iterator script_output = _outputs.find(fd);
 			if (script_output != _outputs.end()) {
 
 				if (events & EPOLLIN)
@@ -410,34 +410,6 @@ void Server::handleSocketError(int fd, std::map<int, Client*>::iterator it) {
 
 }
 
-// void Server::handleSocketHangup(int fd) {
-//
-// 	std::map<int, Client*>::iterator it = _clients.find(fd);
-//
-// 	if (it == _clients.end() || it->second == NULL) {
-// 		// throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
-// 		log.warn("client lookup:: " + std::string(NFIND_CLIENT));
-// 	}
-//
-// 	cleanUpClient(it);
-// 	return;
-//
-// }
-
-// void Server::handleRemoteHangup(int fd) {
-//
-// 	std::map<int, Client*>::iterator it = _clients.find(fd);
-//
-// 	if (it == _clients.end() || it->second == NULL) {
-// 		// throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
-// 		log.warn("client lookup:: " + std::string(NFIND_CLIENT));
-// 	}
-//
-// 	cleanUpClient(it);
-// 	return;
-//
-// }
-
 bool Server::handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it) {
 
 	// std::map<int, Client*>::iterator it = _clients.find(fd);
@@ -474,15 +446,40 @@ bool Server::handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it) 
 			dispatcher.handleRequest(client);
 		}
 
-		// TODO
+		// TEST
 		// register pipes and add them to _outputs
+		if (client.cgi_process != NULL) {
+
+			int std_in = client.cgi_process->stdinFd();
+			int std_out = client.cgi_process->stdoutFd();
+
+			if (!setPollInterest(std_in, true)) {
+				throw std::runtime_error("epoll_ctl: " + std::string(strerror(errno)));
+			}
+			if (!setNonblockFlag(std_in)) {
+				throw std::runtime_error("epoll_ctl: " + std::string(strerror(errno)));
+			}
+			if (!setWRONLYInterest(std_in, true)) {
+				cleanUpClient(it);
+			}
+			_outputs[std_in] = &client;
+			if (!setPollInterest(std_out, true)) {
+				throw std::runtime_error("epoll_ctl: " + std::string(strerror(errno)));
+			}
+			if (!setNonblockFlag(std_out)) {
+				throw std::runtime_error("epoll_ctl: " + std::string(strerror(errno)));
+			}
+			if (!setRDONLYInterest(std_out, true)) {
+				cleanUpClient(it);
+			}
+			_outputs[std_out] = &client;
+			// Returning here as we have to wait for pipe readyness to start writing to std_in.
+			return true;
+		}
 
 		if (client.getState() == Client::RECEIVING_BODY) {
 			client.parseDataFromPeer();
 		}
-
-		// TODO
-		// go back to dispatcher to have client state set to AWAITING_CGI_OUTPUT???
 
 		if (client.getState() == Client::PREPARING_RESPONSE) {
 			dispatcher.handleRequest(client);
@@ -508,22 +505,14 @@ bool Server::handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it) 
 	}
 }
 
-void Server::handlePipeReadEvent(int fd, std::map<int, Owners>::iterator it) {
+void Server::handlePipeReadEvent(int fd, std::map<int, Client*>::iterator it) {
 
-	// std::map<int, ScriptOutput*>::iterator it = _outputs.find(fd);
-	// if (it == _outputs.end() || it->second == NULL) {
-	//  // throw std::runtime_error("client lookup:: " + std::string(NFIND_CLIENT));
-	//  log.warn("CGI process lookup:: " + std::string(NFIND_SCRIPT));
-	//  return;
-	// }
- //
-	// CgiProcess& script = *it->second;
-	// if (client.getState() == Client::AWAITING_CGI_OUTPUT) {
-		// script.queueIncomingData(fd);
-	// }
-	if (it->second.client->getState() == Client::AWAITING_CGI_OUTPUT) {
-		it->second.script->queueIncomingData(fd);
+	Client& client = *it->second;
+
+	if (client.getState() == Client::AWAITING_CGI_OUTPUT) {
+		client.cgi_process->queueIncomingData(fd);
 	}
+	// TODO have the CGI process parse the CGI response and populate the response object
 
 	return;
 }
@@ -580,13 +569,15 @@ void Server::handleSocketWriteEvent(int fd, std::map<int, Client*>::iterator it)
 	return;
 }
 
-void Server::handlePipeWriteEvent(int fd, std::map<int, Owners>::iterator it) {
+void Server::handlePipeWriteEvent(int fd, std::map<int, Client*>::iterator it) {
 
+	Client& client = *it->second;
 
-	if (it->second.client->getState() == Client::PREPARING_RESPONSE) {
-		// TODO have the CGI handler parse the CGI response and populate the response object
-   }
-   return;
+	if (client.getState() == Client::RECEIVING_BODY) {
+		client.parseDataFromPeer();
+	}
+
+	return;
 }
 
 void Server::cleanUpAllRessources(void) {

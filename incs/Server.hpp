@@ -13,7 +13,6 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
-#include "CgiProcess.hpp"
 #define server Server::instance()
 
 #include "Client.hpp"
@@ -32,11 +31,6 @@ address family."
 struct ListeningSocket {
 	sockaddr_in								addr;
 	const Config::Socket*					conf;
-};
-
-struct Owners {
-	Client*									client;
-	CgiProcess*								script;
 };
 
 class Server {
@@ -61,9 +55,9 @@ public:
 
 	bool									handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it);
 
-	void									handlePipeReadEvent(int fd, std::map<int, Owners>::iterator it);
+	void									handlePipeReadEvent(int fd, std::map<int, Client*>::iterator it);
 	void									handleSocketWriteEvent(int fd, std::map<int, Client*>::iterator it);
-	void									handlePipeWriteEvent(int fd, std::map<int, Owners>::iterator it);
+	void									handlePipeWriteEvent(int fd, std::map<int, Client*>::iterator it);
 
 	void									cleanUpAllRessources(void);
 	void									cleanUpClient(std::map<int, Client*>::iterator it);
@@ -85,7 +79,7 @@ private:
 	// std::map<int, const Config::Socket*>	_sockets;
 	std::map<int, ListeningSocket>			_sockets;
 	std::map<int, Client*>					_clients;
-	std::map<int, Owners>					_outputs;
+	std::map<int, Client*>					_outputs;
 
 	epoll_event								_events[MAX_EPOLL_EVENTS];
 

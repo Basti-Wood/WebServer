@@ -1,4 +1,4 @@
-#include "../incs/CgiProcess.hpp"
+#include "../incs/CGIProcess.hpp"
 #include "../incs/utils.hpp"
 #include "../incs/constexpr.hpp"
 
@@ -12,28 +12,22 @@
 #include <string.h>
 #include <stdlib.h>
 #include <vector>
-#include <sstream>
 
 static const int CGI_TIMEOUT_S = 10;
 
-CgiProcess::CgiProcess(const std::string& path, const std::vector<std::string>& args,
-                        const std::map<std::string, std::string>& env,
-                        const std::string& input, const std::string& working_dir)
+CGIProcess::CGIProcess(const std::string& path, const std::vector<std::string>& args,
+                       const std::map<std::string, std::string>& env,
+                       const std::string& working_dir)
     : _path(path), _args(args), _env(env), _working_dir(working_dir),
       _pipes_open(false),
-      _pid(-1), _stdin_fd(-1), _stdout_fd(-1), _input(input), _input_offset(0),
+      _pid(-1), _stdin_fd(-1), _stdout_fd(-1),
       _reaped(false), _exit_code(-1), _deadline(0),
       _state(WRITING_PIPES),
       _status(OK), _content_type("text/html"),
-      _has_status(false), _has_location(false), _headers_done(false)
-{
+      _has_status(false), _has_location(false), _headers_done(false) {
+
     _in_pipe[0] = -1; _in_pipe[1] = -1;
     _out_pipe[0] = -1; _out_pipe[1] = -1;
-
-    if (!input.empty()) {
-        _instream.data.assign(input.begin(), input.end());
-        _instream.end = input.size();
-    }
 
     if (pipe(_in_pipe) == -1)
         return;
@@ -46,7 +40,7 @@ CgiProcess::CgiProcess(const std::string& path, const std::vector<std::string>& 
     _pipes_open = true;
 }
 
-bool CgiProcess::spawn() {
+bool CGIProcess::spawn() {
 
     if (!_pipes_open || _pid != -1)
         return false;
@@ -99,16 +93,19 @@ bool CgiProcess::spawn() {
     _in_pipe[0] = -1;
     _out_pipe[1] = -1;
 
-    if (fcntl(_in_pipe[1], F_SETFL, O_NONBLOCK) == -1 ||
-        fcntl(_out_pipe[0], F_SETFL, O_NONBLOCK) == -1) {
-        close(_in_pipe[1]);
-        close(_out_pipe[0]);
-        _in_pipe[1] = -1;
-        _out_pipe[0] = -1;
-        kill(pid, SIGKILL);
-        waitpid(pid, NULL, 0);
-        return false;
-    }
+    // Let's try having to server set the pipe ends to non-blocking.
+    // If it that's too late, set them to non-blocking here.
+    // TEST
+    // if (fcntl(_in_pipe[1], F_SETFL, O_NONBLOCK) == -1 ||
+    //     fcntl(_out_pipe[0], F_SETFL, O_NONBLOCK) == -1) {
+    //     close(_in_pipe[1]);
+    //     close(_out_pipe[0]);
+    //     _in_pipe[1] = -1;
+    //     _out_pipe[0] = -1;
+    //     kill(pid, SIGKILL);
+    //     waitpid(pid, NULL, 0);
+    //     return false;
+    // }
 
     _pid = pid;
     _stdin_fd = _in_pipe[1];
@@ -117,15 +114,10 @@ bool CgiProcess::spawn() {
     _out_pipe[0] = -1; // ownership to _stdout_fd
     _deadline = time(NULL) + CGI_TIMEOUT_S;
 
-    if (_input.empty()) {
-        close(_stdin_fd);
-        _stdin_fd = -1;
-    }
-
     return true;
 }
 
-CgiProcess::~CgiProcess() {
+CGIProcess::~CGIProcess() {
     if (_stdin_fd != -1) close(_stdin_fd);
     if (_stdout_fd != -1) close(_stdout_fd);
     if (_in_pipe[0] != -1) close(_in_pipe[0]);
@@ -138,19 +130,19 @@ CgiProcess::~CgiProcess() {
     }
 }
 
-bool  CgiProcess::valid()     const { return _pipes_open; }
-pid_t CgiProcess::pid()       const { return _pid; }
-const int   CgiProcess::stdinFd()         { return _stdin_fd; }
-const int   CgiProcess::stdoutFd()  const { return _stdout_fd; }
+bool  CGIProcess::valid()     const { return _pipes_open; }
+pid_t CGIProcess::pid()       const { return _pid; }
+const int   CGIProcess::stdinFd()         { return _stdin_fd; }
+const int   CGIProcess::stdoutFd()  const { return _stdout_fd; }
 
-void CgiProcess::closeStdin() {
+void CGIProcess::closeStdin() {
 	if (_stdin_fd != -1) {
 		close(_stdin_fd);
 		_stdin_fd = -1;
 	}
 }
 
-void CgiProcess::closeStdout() {
+void CGIProcess::closeStdout() {
 	if (_stdout_fd != -1) {
 		close(_stdout_fd);
 		_stdout_fd = -1;
@@ -158,7 +150,7 @@ void CgiProcess::closeStdout() {
 }
 
 
-ssize_t CgiProcess::queueIncomingData(int fd) {
+ssize_t CGIProcess::queueIncomingData(int fd) {
 	ssize_t bytes_read = fetchNbuff(fd, _outstream);
 	return bytes_read;
 }
@@ -166,7 +158,7 @@ ssize_t CgiProcess::queueIncomingData(int fd) {
 
 // same shape as handleWritable(), just using _instream
 // of the raw _input string
-void CgiProcess::writeStdin() {
+void CGIProcess::writeStdin() {
 
 	if (_state != WRITING_PIPES)
 		return;
@@ -195,7 +187,7 @@ void CgiProcess::writeStdin() {
 }
 
 // same shape as writeStdin(), just reading into _outstream instead
-void CgiProcess::readStdout() {
+void CGIProcess::readStdout() {
 
 	// nothing else moves us from PROCESSING to READING_PIPES, do it here
 	if (_state == PROCESSING)
@@ -247,7 +239,7 @@ static bool isIgnored(const std::string& name) {
 // trims directly against the buffer first, so there's only one extraction
 // (already trimmed) instead of one to pull the raw line out and another
 // inside trim()
-bool CgiProcess::_consumeHeaderLine(std::size_t line_len) {
+bool CGIProcess::_consumeHeaderLine(std::size_t line_len) {
 
 	std::size_t first = 0;
 	while (first < line_len && isLineWS(_outstream.data[_outstream.begin + first]))
@@ -302,7 +294,7 @@ bool CgiProcess::_consumeHeaderLine(std::size_t line_len) {
 
 // consumes whatever complete lines are in _outstream, same technique as
 // parseRequestLine()/parseHeaders(), just for cgi output
-void CgiProcess::_consumeAvailableOutput() {
+void CGIProcess::_consumeAvailableOutput() {
 
 	if (_headers_done) {
 		_body += _outstream.substr(0);
@@ -333,7 +325,7 @@ void CgiProcess::_consumeAvailableOutput() {
 
 // headers/body/status were already parsed incrementally as bytes arrived
 // (see _consumeAvailableOutput()), this just transfers them onto response
-void CgiProcess::buildResponse(HTTPResponse& response, bool headers_only) const {
+void CGIProcess::buildResponse(HTTPResponse& response, bool headers_only) const {
 
     // a broken pipe read/write, or a malformed header line (bad field-name
     // char), lands here instead of COMPLETE
@@ -361,55 +353,58 @@ void CgiProcess::buildResponse(HTTPResponse& response, bool headers_only) const 
 
 }
 
-bool  CgiProcess::wantsWrite() const { return _stdin_fd != -1; }
-bool  CgiProcess::wantsRead()  const { return _stdout_fd != -1; }
-bool  CgiProcess::isDone()     const { return _stdin_fd == -1 && _stdout_fd == -1 && _reaped; }
-bool  CgiProcess::isExpired(time_t now) const { return _pid != -1 && now >= _deadline; }
+bool  CGIProcess::wantsWrite() const { return _stdin_fd != -1; }
+bool  CGIProcess::wantsRead()  const { return _stdout_fd != -1; }
+bool  CGIProcess::isDone()     const { return _stdin_fd == -1 && _stdout_fd == -1 && _reaped; }
+bool  CGIProcess::isExpired(time_t now) const { return _pid != -1 && now >= _deadline; }
 
-void CgiProcess::handleWritable() {
-    if (_stdin_fd == -1)
-        return;
-    if (_input_offset >= _input.size()) {
-        close(_stdin_fd);
-        _stdin_fd = -1;
-        return;
-    }
-    ssize_t written = write(_stdin_fd, _input.data() + _input_offset, _input.size() - _input_offset);
-    if (written > 0)
-        _input_offset += (size_t)written;
-    else if (written == -1 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
-        close(_stdin_fd);
-        _stdin_fd = -1;
-        return;
-    }
-    if (_input_offset == _input.size()) {
-        close(_stdin_fd);
-        _stdin_fd = -1;
-    }
-}
+// deprecated
+// void CGIProcess::handleWritable() {
+//     if (_stdin_fd == -1)
+//         return;
+//     if (_input_offset >= _input.size()) {
+//         close(_stdin_fd);
+//         _stdin_fd = -1;
+//         return;
+//     }
+//     ssize_t written = write(_stdin_fd, _input.data() + _input_offset, _input.size() - _input_offset);
+//     if (written > 0)
+//         _input_offset += (size_t)written;
+//     else if (written == -1 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+//         close(_stdin_fd);
+//         _stdin_fd = -1;
+//         return;
+//     }
+//     if (_input_offset == _input.size()) {
+//         close(_stdin_fd);
+//         _stdin_fd = -1;
+//     }
+// }
 
-void CgiProcess::handleReadable() {
-    if (_stdout_fd == -1)
-        return;
-    const size_t BUF_SZ = 4096;
-    char buf[BUF_SZ];
-    while (true) {
-        ssize_t r = read(_stdout_fd, buf, BUF_SZ);
-        if (r > 0) {
-            _output.append(buf, buf + r);
-            continue;
-        }
-        if (r == -1 && errno == EINTR)
-            continue;
-        if (r == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
-            return;
-        close(_stdout_fd);
-        _stdout_fd = -1;
-        return;
-    }
-}
+// deprecated
+// void CGIProcess::handleReadable() {
+//     if (_stdout_fd == -1)
+//         return;
+//     const size_t BUF_SZ = 4096;
+//     char buf[BUF_SZ];
+//     while (true) {
+//         ssize_t r = read(_stdout_fd, buf, BUF_SZ);
+//         if (r > 0) {
+//             _output.append(buf, buf + r);
+//             continue;
+//         }
+//         if (r == -1 && errno == EINTR)
+//             continue;
+//         if (r == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+//             return;
+//         close(_stdout_fd);
+//         _stdout_fd = -1;
+//         return;
+//     }
+// }
 
-bool CgiProcess::tryReap(bool block) {
+bool CGIProcess::tryReap(bool block) {
+
     if (_reaped)
         return true;
     if (_pid == -1) {
@@ -429,53 +424,55 @@ bool CgiProcess::tryReap(bool block) {
     return true;
 }
 
-void CgiProcess::forceKill() {
+void CGIProcess::forceKill() {
     if (_pid != -1)
         kill(_pid, SIGKILL);
 }
 
-CGIResult CgiProcess::result() const {
-    CGIResult res;
-    res.exit_code = _exit_code;
-    res.raw_output = _output;
-
-    size_t hdr_end = _output.find("\r\n\r\n");
-    size_t sep_len = 4;
-    if (hdr_end == std::string::npos) {
-        hdr_end = _output.find("\n\n");
-        sep_len = 2;
-    }
-    if (hdr_end == std::string::npos) {
-        res.body = _output;
-        return res;
-    }
-    res.body = _output.substr(hdr_end + sep_len);
-
-    std::istringstream ss(_output.substr(0, hdr_end));
-    std::string line;
-    while (std::getline(ss, line)) {
-        if (!line.empty() && line[line.size()-1] == '\r') line.resize(line.size()-1);
-        if (line.empty()) continue;
-        size_t colon = line.find(':');
-        if (colon == std::string::npos) continue;
-        std::string key = trim(line.substr(0, colon));
-        std::string val = trim(line.substr(colon+1));
-        std::string key_l = tolowerASCII(key);
-        res.headers[key_l] = val;
-        if (key_l == "status") {
-            std::istringstream s2(val);
-            int st; s2 >> st;
-            if (s2) res.status = st;
-        }
-    }
-    return res;
-}
+// deprecated??
+// CGIResult CGIProcess::result() const {
+//
+//     CGIResult res;
+//     res.exit_code = _exit_code;
+//     res.raw_output = _output;
+//
+//     size_t hdr_end = _output.find("\r\n\r\n");
+//     size_t sep_len = 4;
+//     if (hdr_end == std::string::npos) {
+//         hdr_end = _output.find("\n\n");
+//         sep_len = 2;
+//     }
+//     if (hdr_end == std::string::npos) {
+//         res.body = _output;
+//         return res;
+//     }
+//     res.body = _output.substr(hdr_end + sep_len);
+//
+//     std::istringstream ss(_output.substr(0, hdr_end));
+//     std::string line;
+//     while (std::getline(ss, line)) {
+//         if (!line.empty() && line[line.size()-1] == '\r') line.resize(line.size()-1);
+//         if (line.empty()) continue;
+//         size_t colon = line.find(':');
+//         if (colon == std::string::npos) continue;
+//         std::string key = trim(line.substr(0, colon));
+//         std::string val = trim(line.substr(colon+1));
+//         std::string key_l = tolowerASCII(key);
+//         res.headers[key_l] = val;
+//         if (key_l == "status") {
+//             std::istringstream s2(val);
+//             int st; s2 >> st;
+//             if (s2) res.status = st;
+//         }
+//     }
+//     return res;
+// }
 
 CGIResult run_cgi(const std::string& path, const std::vector<std::string>& args,
                    const std::map<std::string, std::string>& env,
-                   const std::string& input, const std::string& working_dir)
-{
-    CgiProcess proc(path, args, env, input, working_dir);
+                   const std::string& working_dir) {
+
+    CGIProcess proc(path, args, env, working_dir);
     if (!proc.valid())
         return CGIResult();
 

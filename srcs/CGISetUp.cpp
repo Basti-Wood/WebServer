@@ -1,6 +1,5 @@
-#include "../incs/CgiEnv.hpp"
-#include <sstream>
-#include <cstdlib>
+#include "../incs/CGISetUp.hpp"
+#include "../incs/Logger.hpp"
 #include <arpa/inet.h>
 
 static std::string to_string_int(int v) {
@@ -25,10 +24,11 @@ static std::string method_to_string(const Method& method) {
     }
 }
 
-std::map<std::string,std::string> build_cgi_env(const HTTPRequest& req,
-                                               const Config::Domain& domain,
-                                               const Config::Location& loc,
-                                               const std::string& script_filename)
+// Build a map of CGI environment variables from the request and server/location config.
+static std::map<std::string,std::string> build_cgi_env(const HTTPRequest& req,
+													   const Config::Domain& domain,
+													   const Config::Location& loc,
+													   const std::string& script_filename)
 {
     std::map<std::string,std::string> env;
     (void)loc;
@@ -77,4 +77,39 @@ std::map<std::string,std::string> build_cgi_env(const HTTPRequest& req,
     }
 
     return env;
+}
+
+StatusCode setUpCGI(Client& client) {
+
+	HTTPRequest& request = client.getCurrentRequest();
+
+	std::string cgi_input; // Delete this
+
+	// argv for execve
+	std::vector<std::string> cgi_args;
+	cgi_args.push_back(request.cgi.binary_path);
+	cgi_args.push_back(request.resolved.filepath);
+	std::string working_dir = request.resolved.filepath.substr(0, request.resolved.filepath.find_last_of('/'));
+
+	std::map<std::string, std::string> env = build_cgi_env(request,
+														   *request.resolved.domain,
+														   *request.resolved.location,
+														   request.resolved.filepath);
+
+	CGIProcess cgi_process(request.cgi.binary_path, cgi_args, env, working_dir);
+	client.cgi_process = &cgi_process;
+
+	if (!client.cgi_process->valid()) {
+		log.error("cgi: failed to open pipes for " + request.cgi.binary_path);
+		return INTERNAL_SERVER_ERROR;
+	}
+
+	if (!client.cgi_process->spawn()) {
+		log.error("cgi: failed to spawn " + request.cgi.binary_path);
+		return INTERNAL_SERVER_ERROR;
+	}
+
+	// epoll registration is still ahead, server side
+	return NO_STATUS;
+
 }

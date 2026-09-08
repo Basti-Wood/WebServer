@@ -16,10 +16,10 @@
 // #include "../incs/HTTPGrammar.hpp"
 #include "../incs/constexpr.hpp"
 #include "../incs/templates.hpp"
+#include "../incs/CGISetUp.hpp"
 // #include "../incs/Config.hpp"
 #include "../incs/Logger.hpp"
 #include "../incs/utils.hpp"
-#include "../incs/CgiHandler.hpp"
 // #include <sys/stat.h>	// stat
 // #include <sys/wait.h>	// waitpid
 #include <dirent.h>		// opendir, readdir, closedir
@@ -411,6 +411,18 @@ static StatusCode handlePOST(const HTTPRequest& request,
 
 }
 
+static StatusCode routeCGI(HTTPRequest& request) {
+
+	if (request.body.size != 0 ||
+		request.body_chunked == true) {
+		request.parsing.state = HTTPRequest::READING_BODY;
+	} else {
+		request.parsing.state = HTTPRequest::COMPLETE;
+	}
+
+	return NO_STATUS;
+}
+
 static StatusCode handleRegularFile(HTTPRequest& request,
 									HTTPResponse& response) {
 
@@ -478,40 +490,12 @@ static StatusCode handleDirectory(HTTPRequest& request,
 
 }
 
-// argv for execve
-static StatusCode routeRequest(HTTPRequest& request,
-							   HTTPResponse& response) {
+static StatusCode routeRequest(HTTPRequest& request, HTTPResponse& response) {
 
-	// // Hand request to CGI
-	// if (request.requires_CGI) {
- //
-	// 	std::vector<std::string> cgi_args = buildCgiArgs(request);
-	// 	(void)cgi_args; // WIP
- //
-	// 	// same deal as PUT/POST, gotta spool the body to disk first
-	// 	if (!request.is_multipart &&
-	// 		(request.body.size != 0 || request.body_chunked)) {
-	// 		if (request.body.size > request.resolved.location->client_max_body_size) {
-	// 			log.warn("payload size exceeds the maximum allowed");
-	// 			return PAYLOAD_TOO_LARGE;
-	// 		}
-	// 		createFile(request);
-	// 	}
-	// 	request.parsing.state = HTTPRequest::READING_BODY;
+	// In case of request for CGI, check if body present
+	if (request.requires_CGI == true) {
 
-		// return handleCGI(request, response);
-
-	// Match CGI extensions
-	if (request.requires_CGI) {
-		// TEST we need to put setting up all things CGI here! The cgi pipes need to be ready to be written to during READING_BODY
-		StatusCode status_code = handleCGI(request, response);
-		if (request.body.size != 0 ||
-			request.body_chunked == true) {
-			request.parsing.state = HTTPRequest::READING_BODY;
-		} else {
-			request.parsing.state = HTTPRequest::COMPLETE;
-		}
-		return status_code;
+		return routeCGI(request);
 
 	// Check if request path exists as static file in `root`
 	} else if (isRegularFile(request.resolved.filepath)) {
@@ -523,13 +507,11 @@ static StatusCode routeRequest(HTTPRequest& request,
 
 		return handleDirectory(request, response);
 
-	// If not found, send not found
+	// If target not found, send 404
 	} else {
 
 		return NOT_FOUND;
-
 	}
-
 }
 
 static StatusCode resolveRoute(Client& client) {
@@ -631,6 +613,12 @@ static StatusCode resolveRoute(Client& client) {
 	if (!decodeURL(path_info, request.cgi.path_info)) {
 		log.error("dispatch error: malformed CGI path info");
 		return BAD_REQUEST;
+	}
+
+	// Set up CGI
+	if (request.requires_CGI) {
+		// TEST we need to put setting up all things CGI here! The cgi pipes need to be ready to be written to during READING_BODY
+		return setUpCGI(client);
 	}
 
 	return NO_STATUS;
