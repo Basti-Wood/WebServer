@@ -33,7 +33,7 @@ RequestParser& RequestParser::instance(void) {
 }
 
 // Feed raw bytes; returns the current parse_state:
-bool RequestParser::buffer(Buffer& buffer, HTTPRequest& request) {
+bool RequestParser::buffer(Buffer& buffer, CGIProcess* cgi_process, HTTPRequest& request) {
 
 	switch (request.parsing.state) {
 
@@ -44,14 +44,14 @@ bool RequestParser::buffer(Buffer& buffer, HTTPRequest& request) {
 	case HTTPRequest::READING_BODY:
 		if (request.body_chunked) {
 			try {
-				return _parseChunks(buffer, request);
+				return _parseChunks(buffer, cgi_process, request);
 			} catch (std::exception& e) {
 				log.error(e.what());
 				return false;
 			}
 		} else {
 			try {
-				return _parseBody(buffer, request);
+				return _parseBody(buffer, cgi_process, request);
 			} catch (std::exception& e) {
 				log.error(e.what());
 				return false;
@@ -480,7 +480,7 @@ bool RequestParser::_parseHeaders(const Buffer& buffer, HTTPRequest& request) {
 
 }
 
-bool RequestParser::_parseChunks(Buffer& buffer, HTTPRequest& request) {
+bool RequestParser::_parseChunks(Buffer& buffer, CGIProcess* cgi_process, HTTPRequest& request) {
 
 	HTTPRequest::ParsingContext& p = request.parsing;
 	p.bytes_read_count = 0;
@@ -548,7 +548,7 @@ bool RequestParser::_parseChunks(Buffer& buffer, HTTPRequest& request) {
 		buffer.end = buffer.begin + count;
 		buffer.mark = buffer.begin;
 
-		bool complete = _parseBody(buffer, request);
+		bool complete = _parseBody(buffer, cgi_process, request);
 
 		std::size_t consumed = p.bytes_read_count;
 
@@ -634,7 +634,7 @@ static bool spoolBody(const std::string& body, int fd) {
     return true;
 }
 
-bool RequestParser::_parseBody(const Buffer& buffer, HTTPRequest& request) {
+bool RequestParser::_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HTTPRequest& request) {
 
 	HTTPRequest::ParsingContext& p = request.parsing;
 	p.bytes_read_count = 0;
@@ -860,7 +860,7 @@ bool RequestParser::_parseBody(const Buffer& buffer, HTTPRequest& request) {
 
 		if (n == 0) return true;
 
-		ssize_t bytes_consumed = write(request.cgi_process->stdinFd(), &buffer.data[buffer.begin], n);
+		ssize_t bytes_consumed = write(cgi_process->stdinFd(), &buffer.data[buffer.begin], n);
 		if (bytes_consumed < 0) {
 			throw std::runtime_error("write: " + std::string(strerror(errno)));
 		}

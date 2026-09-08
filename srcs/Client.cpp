@@ -236,7 +236,7 @@ void Client::parseDataFromPeer(void) {
 		bool has_consumed_line = false;
 
 		try {
-			has_consumed_line = parse.buffer(_instream, request);
+			has_consumed_line = parse.buffer(_instream, cgi_process, request);
 		} catch (std::exception& e) {
 			request.parsing.error_cause = INTERNAL_SERVER_ERROR;
 			request.parsing.state = HTTPRequest::ERROR;

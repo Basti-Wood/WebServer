@@ -14,6 +14,7 @@
 #define HTTP_REQUEST_PARSER_HPP
 
 #include "HTTPRequest.hpp"
+#include "CGIProcess.hpp"
 // #include "Config.hpp"
 #include "Buffer.hpp"
 // #include <string>
@@ -28,7 +29,7 @@ public:
 
 	static RequestParser&					instance(void);
 
-	bool									buffer(Buffer& buff, HTTPRequest& request);
+	bool									buffer(Buffer& buff, CGIProcess* cgi_process, HTTPRequest& request);
 
 	Method									matchMethod(const std::string& name);
 
@@ -57,9 +58,9 @@ private:
 	bool									_parseDataCRLF(const Buffer& input, Buffer& output);
 	bool									_parseTrailers(const Buffer& input, Buffer& output);
 
-	bool									_parseChunks(Buffer& input, HTTPRequest& request);
+	bool									_parseChunks(Buffer& input, CGIProcess* cgi_process, HTTPRequest& request);
 
-	bool									_parseBody(const Buffer& buffer, HTTPRequest& request);
+	bool									_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HTTPRequest& request);
 
 };
 

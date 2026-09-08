@@ -147,7 +147,6 @@ private:
 
 	Buffer							_instream;
 	Buffer							_outstream;
-	Buffer							_pipestream;
 
 	Response						_response;
 
