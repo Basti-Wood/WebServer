@@ -320,10 +320,10 @@ void Server::handleEvents(void) {
 				int fd = immediate->first;
 				Client& client = *immediate->second;
 // DEBUG BEGIN
-				log.debug("Client fd_" + i2a(fd)
+				log.debug("client_" + i2a(fd)
 				+ " idle time: " + i2a(client.getIdleTime()) + "s");
 // DEBUG END
-				log.warn("Client fd_" + i2a(fd) + " timed out");
+				log.warn("client_" + i2a(fd) + " timed out");
 
 				if (client.getState() == Client::RECEIVING_HEADERS) {
 					client.pushResponse();
@@ -382,7 +382,7 @@ void Server::acceptConnectRequest(int listen_fd, ListeningSocket socket) {
 		return;
 	}
 
-	log.info("Client fd_" + i2a(client_fd) + ", endpoint "
+	log.info("client_" + i2a(client_fd) + ", endpoint "
 				+ c->getRemoteAddress() + ":" + i2a(c->getRemotePort()));
 	return;
 
