@@ -42,26 +42,13 @@ bool RequestParser::buffer(Buffer& buffer, CGIProcess* cgi_process, HTTPRequest&
 	case HTTPRequest::READING_HEADERS:
 		return _parseHeaders(buffer, request);
 	case HTTPRequest::READING_BODY:
-		if (request.body_chunked) {
-			try {
-				return _parseChunks(buffer, cgi_process, request);
-			} catch (std::exception& e) {
-				log.error(e.what());
-				return false;
-			}
-		} else {
-			try {
-				return _parseBody(buffer, cgi_process, request);
-			} catch (std::exception& e) {
-				log.error(e.what());
-				return false;
-			}
-		}
+		if (request.body_chunked)
+			return _parseChunks(buffer, cgi_process, request);
+		else
+			return _parseBody(buffer, cgi_process, request);
 	default:
 		return false;
-
 	}
-
 }
 
 Method RequestParser::matchMethod(const std::string& method) {
@@ -76,8 +63,8 @@ Method RequestParser::matchMethod(const std::string& method) {
 			return static_cast<Method>(i);
 		}
 	}
-	return METHOD_COUNT;
 
+	return METHOD_COUNT;
 }
 
   //~~~~~~~~~~~//
@@ -119,8 +106,8 @@ ssize_t RequestParser::_findRequestLineEnd(const Buffer& buffer, HTTPRequest& re
 		request.parsing.line_ending = HTTPRequest::CRLF;
 		return LF_pos - 1;
 	}
-	return LF_pos;
 
+	return LF_pos;
 }
 
 bool RequestParser::_extractTokens(const Buffer& buffer, HTTPRequest& request) {
@@ -354,8 +341,8 @@ bool RequestParser::_parseHeaders(const Buffer& buffer, HTTPRequest& request) {
 			// Check for Host Header (mandatory for HTTP/1.1)
 			if (request.getVersion() == http::V_1_1 && request.getHeader("host") == NULL) {
 				log.warn("request: no host header provided");
-				request.parsing.state = HTTPRequest::ERROR;
 				request.parsing.error_cause = BAD_REQUEST;
+				request.parsing.state = HTTPRequest::ERROR;
 				return false;
 			}
 
@@ -468,8 +455,8 @@ bool RequestParser::_parseHeaders(const Buffer& buffer, HTTPRequest& request) {
 
 		if (!_parseHeaderLine(buffer, request)) {
 			log.error("parse error: something went wrong while parsing a header line");
-			request.parsing.state = HTTPRequest::ERROR;
 			request.parsing.error_cause = BAD_REQUEST;
+			request.parsing.state = HTTPRequest::ERROR;
 			return false;
 		}
 
@@ -507,7 +494,10 @@ bool RequestParser::_parseChunks(Buffer& buffer, CGIProcess* cgi_process, HTTPRe
 			char c = buffer.data[buffer.begin + i];
 			if (c == ';') break;
 			if (!isHexDigit(c)) {
-				throw std::runtime_error("invalid chunk size");
+				log.error("invalid chunk size");
+				request.parsing.error_cause = BAD_REQUEST;
+				request.parsing.state = HTTPRequest::ERROR;
+				return false;
 			}
 
 			int digit = hexDigitValue(c);
@@ -579,12 +569,21 @@ bool RequestParser::_parseChunks(Buffer& buffer, CGIProcess* cgi_process, HTTPRe
 		if (p.line_ending == HTTPRequest::CRLF) {
 			if (buffer.data[buffer.mark] != '\r' ||
 				buffer.data[buffer.mark + 1] != '\n')
-				throw std::runtime_error("invalid chunk CRLF");
+				log.error("invalid chunk CRLF");
+				request.parsing.error_cause = BAD_REQUEST;
+				request.parsing.state = HTTPRequest::ERROR;
+				return false;
 		} else if (p.line_ending ==  HTTPRequest::LF) {
 			if (buffer.data[buffer.mark] != '\n')
-				throw std::runtime_error("invalid chunk LF");
+				log.error("invalid chunk LF");
+				request.parsing.error_cause = BAD_REQUEST;
+				request.parsing.state = HTTPRequest::ERROR;
+				return false;
 		} else {
-			throw std::runtime_error("invalid chunk");
+			log.error("invalid chunk");
+			request.parsing.error_cause = INTERNAL_SERVER_ERROR;
+			request.parsing.state = HTTPRequest::ERROR;
+			return false;
 		}
 
 		p.bytes_read_count = p.line_end_size;
@@ -617,14 +616,14 @@ bool RequestParser::_parseChunks(Buffer& buffer, CGIProcess* cgi_process, HTTPRe
 static bool spoolBody(const std::string& body, int fd) {
 
 	const char *data = body.c_str();
-	ssize_t bytes_left = static_cast<ssize_t>(body.size());
+	ssize_t bytes_in_heap = static_cast<ssize_t>(body.size());
 
-	while (bytes_left > 0) {
-		ssize_t bytes_written = write(fd, data, bytes_left);
+	while (bytes_in_heap > 0) {
+		ssize_t bytes_spooled = write(fd, data, bytes_in_heap);
 
-		if (bytes_written > 0) {
-			data += bytes_written;
-			bytes_left -= bytes_written;
+		if (bytes_spooled > 0) {
+			data += bytes_spooled;
+			bytes_in_heap -= bytes_spooled;
 		} else {
 			close(fd);
 			return false;
@@ -702,13 +701,16 @@ bool RequestParser::_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HT
 				if (size <= keep) return false;
 
 				std::size_t n = size - keep;
-				ssize_t bytes_written = write(request.body.parts.back().file,
+				ssize_t bytes_consumed = write(request.body.parts.back().file,
 											  &buffer.data[buffer.begin], n);
-				if (bytes_written < 0) {
-					throw std::runtime_error("write: " + std::string(strerror(errno)));
+				if (bytes_consumed < 0) {
+					log.error("write: " + std::string(strerror(errno)));
+					request.parsing.error_cause = INTERNAL_SERVER_ERROR;
+					request.parsing.state = HTTPRequest::ERROR;
+					return false;
 				}
 
-				p.bytes_read_count = bytes_written;
+				p.bytes_read_count = bytes_consumed;
 				return true;
 
 			} else if (boundary_pos == 0) {
@@ -726,23 +728,24 @@ bool RequestParser::_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HT
 				/*
 				* Everything before the boundary is definitely part data.
 				*/
-				ssize_t bytes_written = write(request.body.parts.back().file,
+				ssize_t bytes_consumed = write(request.body.parts.back().file,
 											  &buffer.data[buffer.begin], boundary_pos);
-				if (bytes_written < 0) {
-
-					throw std::runtime_error("write: " + std::string(strerror(errno)));
-
+				if (bytes_consumed < 0) {
+					log.error("write: " + std::string(strerror(errno)));
+					request.parsing.error_cause = INTERNAL_SERVER_ERROR;
+					request.parsing.state = HTTPRequest::ERROR;
+					return false;
 				}
 
-				if (bytes_written < boundary_pos) {
+				if (bytes_consumed < boundary_pos) {
 
 					// Don't advance past bytes that weren't written.
-					p.bytes_read_count = bytes_written;
+					p.bytes_read_count = bytes_consumed;
 					return true;
 
 				}
 
-				p.bytes_read_count = bytes_written + boundary.size();
+				p.bytes_read_count = bytes_consumed + boundary.size();
 				p.multipart_state = HTTPRequest::BOUNDARY;
 				return true;
 
@@ -849,6 +852,13 @@ bool RequestParser::_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HT
 		/*
 		* Body is input for CGI stdin:
 		*/
+		if (cgi_process == NULL) {
+			log.error("null pointer provided");
+			request.parsing.error_cause = INTERNAL_SERVER_ERROR;
+			request.parsing.state = HTTPRequest::ERROR;
+			return false;
+		}
+
 		std::size_t n;
 		if (request.body_chunked) {
 			n = buffer.range();
@@ -862,7 +872,10 @@ bool RequestParser::_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HT
 
 		ssize_t bytes_consumed = write(cgi_process->stdinFd(), &buffer.data[buffer.begin], n);
 		if (bytes_consumed < 0) {
-			throw std::runtime_error("write: " + std::string(strerror(errno)));
+			log.error("write: " + std::string(strerror(errno)));
+			request.parsing.error_cause = INTERNAL_SERVER_ERROR;
+			request.parsing.state = HTTPRequest::ERROR;
+			return false;
 		}
 
 		p.bytes_read_count = bytes_consumed;
@@ -925,7 +938,10 @@ bool RequestParser::_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HT
 			log.error("request body file: " + i2a(request.body.file));
 			bytes_consumed = write(request.body.file, &buffer.data[buffer.begin], n);
 			if (bytes_consumed < 0) {
-				throw std::runtime_error("write: " + std::string(strerror(errno)));
+				log.error("write: " + std::string(strerror(errno)));
+				request.parsing.error_cause = INTERNAL_SERVER_ERROR;
+				request.parsing.state = HTTPRequest::ERROR;
+				return false;
 			}
 			break;
 

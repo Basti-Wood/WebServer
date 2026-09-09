@@ -232,23 +232,13 @@ void Client::parseDataFromPeer(void) {
 
 	while (_instream.mark < _instream.end) {
 
-		std::size_t bytes_read = 0;
-		bool has_consumed_line = false;
-
-		try {
-			has_consumed_line = parse.buffer(_instream, cgi_process, request);
-		} catch (std::exception& e) {
-			request.parsing.error_cause = INTERNAL_SERVER_ERROR;
-			request.parsing.state = HTTPRequest::ERROR;
-			break;
-		}
-
+		bool has_consumed_line = parse.buffer(_instream, cgi_process, request);
 		if (request.parsing.state == HTTPRequest::ERROR) {
 			break;
 		}
 
-		bytes_read = request.parsing.bytes_read_count;
-		if (bytes_read == std::string::npos || bytes_read == 0) {
+		std::size_t bytes_read = request.parsing.bytes_read_count;
+		if (bytes_read == 0 || bytes_read == std::string::npos) {
 			return;
 		} else {
 			_instream.mark += bytes_read;
