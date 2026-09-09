@@ -332,6 +332,7 @@ void Server::handleEvents(void) {
 												  client.getCurrentRequest().headers_only,
 												  client.getCurrentResponse());
 					client.setState(Client::PENDING_RESPONSE);
+					log.debug("client_" + i2a(fd) + ": state set to PENDING_RESPONSE");
 					client.popRequest();
 					if (!setWRONLYInterest(fd)) {
 						cleanUpClient(immediate);

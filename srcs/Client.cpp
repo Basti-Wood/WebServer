@@ -445,6 +445,7 @@ void Client::sendDataToTCPPeer(int fd) {
 
 		log.error(e.what());
 		_state = ERROR;
+		log.debug("client_" + i2a(fd) + ": state set to ERROR");
 		return;
 
 	}
@@ -455,6 +456,7 @@ void Client::sendDataToTCPPeer(int fd) {
 			log.error("send: client_" + i2a(fd) + ": " + std::string(strerror(errno)));
 		}
 		_state = ERROR;
+		log.debug("client_" + i2a(fd) + ": state set to ERROR");
 		return;
 
 	} else {
