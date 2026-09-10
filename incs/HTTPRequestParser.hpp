@@ -14,52 +14,41 @@
 #define HTTP_REQUEST_PARSER_HPP
 
 #include "HTTPRequest.hpp"
-// #include "HTTPResponse.hpp"
-#include "Config.hpp"
+#include "CGIProcess.hpp"
+// #include "Config.hpp"
 #include "Buffer.hpp"
-// #include "utils.hpp"
-// #include <stdexcept>
-// #include <sstream>
-// #include <vector>
-#include <string>
-// #include <map>
-// #include <climits>
-#include <cstddef>
-// #include <typeinfo>
-#include <sys/stat.h>
+// #include <string>
+// #include <cstddef>
+// #include <sys/stat.h>
 
-#define parse Parser::instance()
+#define parse RequestParser::instance()
 
-class Parser {
+class RequestParser {
 
 public:
 
-	static Parser&							instance(void);
+	static RequestParser&					instance(void);
 
-	// HTTPRequest::ParseState					incomingData(const std::string& raw, HTTPRequest* request);
-	bool									buffer(Buffer& buff, HTTPRequest& request);
-	// bool									body(const Client::Buffer& buff, HTTPRequest& request);
+	bool									buffer(Buffer& buff, CGIProcess* cgi_process, HTTPRequest& request);
 
-	Method									extractMethod(const std::string& name);
+	Method									matchMethod(const std::string& name);
 
 private:
 
-	Parser(void);
-	Parser(const Parser& other);
-	Parser& operator = (const Parser& other);
-	~Parser(void);
+	RequestParser(void);
+	RequestParser(const RequestParser& other);
+	RequestParser& operator = (const RequestParser& other);
+	~RequestParser(void);
 
-	static const size_t 					LF_SIZE = 1;
-	static const size_t 					CRLF_SIZE = 2;
-	static const size_t						LFLF_SIZE = 2;
-	static const size_t						CRLFCRLF_SIZE = 4;
+	static const std::size_t 				LF_SIZE = 1;
+	static const std::size_t 				CRLF_SIZE = 2;
+	static const std::size_t				LFLF_SIZE = 2;
+	static const std::size_t				CRLFCRLF_SIZE = 4;
 
-	size_t									_findRequestLineEnd(const Buffer& buffer, HTTPRequest& request);
+	ssize_t									_findRequestLineEnd(const Buffer& buffer, HTTPRequest& request);
 
-	// bool									_matchMethod(const std::string& method);
 	bool									_extractTokens(const Buffer& buffer, HTTPRequest& request);
 	bool									_parseHeaderLine(const Buffer& buffer, HTTPRequest& request);
-	// bool									_extractContentLength(void);
 
 	bool									_parseRequestLine(const Buffer& buffer, HTTPRequest& request);
 	bool									_parseHeaders(const Buffer& buffer, HTTPRequest& request);
@@ -69,12 +58,10 @@ private:
 	bool									_parseDataCRLF(const Buffer& input, Buffer& output);
 	bool									_parseTrailers(const Buffer& input, Buffer& output);
 
-	bool									_parseChunks(Buffer& input, HTTPRequest& request);
+	bool									_parseChunks(Buffer& input, CGIProcess* cgi_process, HTTPRequest& request);
 
-	bool									_parseBody(const Buffer& buffer, HTTPRequest& request);
+	bool									_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HTTPRequest& request);
 
 };
-
-// #include "Parser.tpp"
 
 #endif

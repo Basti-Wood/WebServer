@@ -62,20 +62,18 @@ void dumpClientConfig(const Client* client) {
 
 	const Config::Socket& soc = client->getConfig();
 	log.info(soc.address + " " + i2a(soc.port));
-	for (size_t i = 0; i < soc.domains.size(); ++i) {
-		for (size_t j = 0; j < soc.domains[i].names.size(); ++j) {
+	for (std::size_t i = 0; i < soc.domains.size(); ++i) {
+		for (std::size_t j = 0; j < soc.domains[i].names.size(); ++j) {
 			log.info(soc.domains[i].names[j]);
 		}
 		log.info(soc.domains[i].root);
-		for (size_t j = 0; j < soc.domains[i].index_files.size(); ++j) {
+		for (std::size_t j = 0; j < soc.domains[i].index_files.size(); ++j) {
 			log.info(soc.domains[i].index_files[j]);
 		}
-		for (size_t j = 0; j < soc.domains[i].locations.size(); ++j) {
+		for (std::size_t j = 0; j < soc.domains[i].locations.size(); ++j) {
 			log.info(soc.domains[i].locations[j].path);
 			log.info(soc.domains[i].locations[j].root);
-			// log.info(soc.domains[i].locations[j].redirect);
-			// log.info(soc.domains[i].locations[j].upload_dir);
-			for (size_t k = 0; k < soc.domains[i].locations[j].index_files.size(); ++k) {
+			for (std::size_t k = 0; k < soc.domains[i].locations[j].index_files.size(); ++k) {
 				log.info(soc.domains[i].locations[j].index_files[k]);
 			}
 		}
@@ -88,25 +86,13 @@ void dumpRequest(const HTTPRequest* request) {
 	switch(request->parsing.state) {
 	case HTTPRequest::READING_REQUEST_LINE: state = "reading request line"; break;
 	case HTTPRequest::READING_HEADERS: state = "reading headers"; break;
+	case HTTPRequest::RESOLVING_ROUTE: state = "resolving route"; break;
 	case HTTPRequest::READING_BODY: state = "reading body"; break;
-	case HTTPRequest::DISPATCHING: state = "dispatching"; break;
-	// case HTTPRequest::FINALIZING: state = "finalizing"; break;
 	case HTTPRequest::COMPLETE: state = "complete"; break;
 	case HTTPRequest::ERROR: state = "error"; break;
 	}
 	log.debug("State:\t\t" + state + " (" + i2a(request->parsing.state) + ")");
-	// log.debug("Method:\t\t" + request->getMethodName());
-	// size_t N = static_cast<size_t>(request->getMethod());
-	// if (N >= static_cast<int>(METHOD_COUNT)) {
-	// 	log.debug("Method:\t\tN/A");
-	// } else {
-	// 	static const std::string valid_methods[
-	// 		static_cast<int>(METHOD_COUNT)
-	// 	] = {
-	// 		"GET", "HEAD", "DELETE", "POST", "PUT"
-	// 	};
-	// 	log.debug("Method:\t\t" + valid_methods[N]);
-	// }
+
 	switch (request->getMethod()) {
 	case GET: log.debug("Method:\t\tGET"); break;
 	case HEAD: log.debug("Method:\t\tHEAD"); break;
@@ -115,6 +101,7 @@ void dumpRequest(const HTTPRequest* request) {
 	case PUT: log.debug("Method:\t\tPUT"); break;
 	case METHOD_COUNT: log.debug("Method:\t\tN/A"); break;
 	}
+
 	log.debug("Path:\t\t" + request->getPath());
 	log.debug("Query:\t\t" + request->getQuery());
 	log.debug("Version:\t" + request->getVersion());
@@ -126,20 +113,7 @@ void dumpRequest(const HTTPRequest* request) {
 	// 	++it;
 	// }
 
-	// const std::map<std::string, std::string>& headers = request->getHeaders();
-
-	// if (includesHeader(headers, "host"))
-	// 	log.debug("Host:\t\t" + request->getHeader("host", 0));
-	// if (includesHeader(headers, "user-agent"))
-	// 	log.debug("User-Agent:\t" + request->getHeader("user-agent", 0));
-	// if (includesHeader(headers, "accept"))
-	// 	log.debug("Accept:\t\t" + request->getHeader("accept", 0));
-	// if (includesHeader(headers, "connection"))
-	// 	log.debug("Connection:\t" + request->getHeader("connection", 0));
-	// if (includesHeader(headers, "content-type"))
-	// 	log.debug("Content-Type:\t" + request->getHeader("content-type", 0));
-	// if (includesHeader(headers, "content-length"))
-	// 	log.debug("Content-Length:\t" + request->getHeader("content-length", 0));
+	// Print select headers
 	const std::string* host = request->getHeader("host");
 	if (host != NULL)
 		log.debug("Host:\t\t" + *host);
@@ -157,13 +131,13 @@ void dumpRequest(const HTTPRequest* request) {
 		log.debug("Content-Type:\t" + *type);
 	const std::string* disposition = request->getHeader("content-disposition");
 	if (disposition != NULL)
-		log.debug("Content-Type:\t" + *disposition);
+		log.debug("Content-Disposition:\t" + *disposition);
 	const std::string* content_length = request->getHeader("content-length");
 	if (content_length != NULL)
 		log.debug("Content-Length:\t" + *content_length);
-		// log.debug("Content-Length:\t" + i2a(request->getContentLength()) + "\n");
-
-	// log.debug("Body:\t\t" + request->getBody().str());
+	const std::string* cookie = request->getHeader("cookie");
+	if (cookie != NULL)
+		log.debug("Cookie:\t\t" + *cookie);
 }
 // DEBUG END
 
@@ -192,23 +166,7 @@ unsigned short stringToUnsignedShort(const std::string& str) {
 
 }
 
-// long stringToLong(const std::string& str) {
-//
-// 	if (str.empty()) {
-// 		throw std::runtime_error("type conversion failed: cannot convert empty string to int");
-// 	}
-//
-// 	char* endptr;
-// 	long tmp = std::strtol(str.c_str(), &endptr, 10);
-//
-// 	if (*endptr != '\0') {
-// 		throw std::runtime_error("type conversion failed (invalid characters): " + str);
-// 	}
-// 	return tmp;
-//
-// }
-
-size_t stringToSize(const std::string& str) {
+std::size_t stringToSize(const std::string& str) {
 
 	if (str.empty()) {
 		throw std::runtime_error("type conversion failed: cannot convert empty string to int");
@@ -229,7 +187,7 @@ size_t stringToSize(const std::string& str) {
 		throw std::out_of_range("type conversion failed (value out of range for unsigned long): " + str);
 	}
 
-	return static_cast<size_t>(tmp);
+	return static_cast<std::size_t>(tmp);
 
 }
 
@@ -253,21 +211,9 @@ int stringToInt(const std::string& str) {
 	return static_cast<int>(tmp);
 }
 
-int hexDigitValue(char c) {
-
-	if (c >= '0' && c <= '9') return c - '0';
-
-	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-
-	if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-
-	return -1;
-
-}
-
 std::string trim(const std::string& str) {
-	size_t first = str.find_first_not_of(" \t\r\n");
-	size_t last = str.find_last_not_of(" \t\r\n");
+	std::size_t first = str.find_first_not_of(" \t\r\n");
+	std::size_t last = str.find_last_not_of(" \t\r\n");
 	if (first == std::string::npos || last == std::string::npos)
 		return "";
 	return str.substr(first, last - first + 1);
@@ -279,11 +225,11 @@ std::string unquote(const std::string& str) {
 	return str;
 }
 
-std::string randomHexString(size_t width) {
+std::string randomHexString(std::size_t byte_width) {
 
 	static const char hex[] = "0123456789abcdef";
 
-	unsigned char* bytes = new unsigned char[width];
+	unsigned char* bytes = new unsigned char[byte_width];
 
 	try {
 		std::ifstream urandom("/dev/urandom", std::ios::in | std::ios::binary);
@@ -292,16 +238,16 @@ std::string randomHexString(size_t width) {
 			throw std::runtime_error("cannot open /dev/urandom");
 		}
 
-		urandom.read(reinterpret_cast<char*>(bytes), static_cast<std::streamsize>(width));
+		urandom.read(reinterpret_cast<char*>(bytes), static_cast<std::streamsize>(byte_width));
 
-		if (urandom.gcount() != static_cast<std::streamsize>(width)) {
+		if (urandom.gcount() != static_cast<std::streamsize>(byte_width)) {
 			throw std::runtime_error("cannot read /dev/urandom");
 		}
 
 		std::string result;
-		result.reserve(width * 2);
+		result.reserve(byte_width * 2);
 
-		for (std::size_t i = 0; i < width; ++i) {
+		for (std::size_t i = 0; i < byte_width; ++i) {
 			result += hex[bytes[i] >> 4];
 			result += hex[bytes[i] & 0x0f];
 		}
@@ -311,49 +257,16 @@ std::string randomHexString(size_t width) {
 	}
 	catch (std::exception& e) {
 		delete [] bytes;
-		log.error("hexgen: " + std::string(e.what()));
-		return i2a(std::time(NULL) * errno == 0 ? 1 : errno);
+		log.error("hexgen: " + std::string(e.what()) + ". Falling back to std::rand");
+		std::string unique_id;
+		while (unique_id.empty() || unique_id.size() < byte_width * 2) {
+			unique_id += i2a(std::rand());
+		}
+		return unique_id;
 	}
 }
 
-bool isHexDigit(char c) {
-	return (c >= '0' && c <= '9') ||
-	(c >= 'A' && c <= 'F') ||
-	(c >= 'a' && c <= 'f');
-}
-
-// bool isReadable(const std::string& path) {
-//
-// 	if (!isRegularFile(path)) {
-// 		return false;
-// 	}
-//
-// 	return access(path.c_str(), R_OK) == 0;
-//
-// }
-
-// bool isValidErrorCode(const int code) {
-//
-// 	return code >= 400 && code < 600;
-//
-// }
-
 bool isRegularFile(const std::string& path) {
-
-	// if (access(path.c_str(), F_OK) == -1) {
-	// 	// return false;
-	// 	log.error("F_KO");
-	// }
-
-	// log.error(path);
-	// struct stat sb;
-	// if (stat(path.c_str(), &sb) != 0) {
-	// int status = stat(path.c_str(), &sb);
-	// log.error(i2a(status));
-	// if (status != 0) {
-	// 	// log.error("FILE cassé");
-	// 	return false;
-	// }
 
 	struct stat sb;
 	if (stat(path.c_str(), &sb) != 0) return false;
@@ -369,138 +282,168 @@ bool isDirectory(const std::string& path) {
 
 }
 
-bool createFile(HTTPRequest& request) {
+void createFile(HTTPRequest& request) {
 
 	const Config::Location& location = *request.resolved.location;
 
-	// log.error(i2a(request.parsing.content_length));
-	// log.error(i2a(location.client_max_body_size));
-	if (request.body.size > location.client_max_body_size) {
-		log.warn("payload size exceeds the maximum allowed");
-		// request.parsing.state = HTTPRequest::ERROR;
-		// request.parsing.error_cause = PAYLOAD_TOO_LARGE;
-		// return StatusCode::PAYLOAD_TOO_LARGE;
-		return false;
-	}
-
-	log.error("KABONGA!");
+	log.info("creating file...!");
 	std::string directory;
 	if (!location.root.empty()) {
 		directory = location.root;
-		// log.debug("root: " + location.root);
 	} else {
 		directory = location.alias;
-		// log.debug("alias: " + location.alias);
 	}
-	log.error("directory: " + directory);
 
+	std::string suffix;
 	int file_descriptor;
 	unsigned short count = 0;
 	std::time_t timestamp = std::time(NULL);
 	do {
-		std::string unique_id = i2a(timestamp) + "-" + randomHexString(5);
+		try {
+			suffix = randomHexString(TEMPORARY_SUFFIX_BYTE_WIDTH);
+		} catch (std::exception& e) {
+			log.warn("random hex string generator: " + std::string(e.what()));
+			std::stringstream oss;
+			oss << timestamp + std::time(NULL);
+			suffix = oss.str();
+		}
+		std::string unique_id = i2a(timestamp) + "-" + suffix;
 		std::string file_path = directory + location.upload_dir + "/.upload_" + unique_id + ".part";
 		file_descriptor = open(file_path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
+		if (file_descriptor < 0) {
+			throw std::runtime_error("file creation failed:" + std::string(strerror(errno)));
+		}
 		log.debug("file_fd: " + i2a(file_descriptor) + "\tfile_path: " + file_path);
 		if (request.is_multipart) {
 			request.body.parts.back().file = file_descriptor;
 			request.body.parts.back().path = file_path;
+			request.body.parts.back().sink = DISK;
 		} else {
 			request.body.file = file_descriptor;
 			request.body.path = file_path;
+			request.body.sink = DISK;
 		}
 	} while (file_descriptor == -1 && errno == EEXIST && ++count < 11);
 
 	request.parsing.state = HTTPRequest::READING_BODY;
-	// log.error("request " + request.debug + " parsing state set to " + i2a(request.parsing.state));
-	// return StatusCode::NO_STATUS;
-	return true;
+	return;
 
 }
 
 static std::string extraxtExtension(const std::string& filename) {
 
-	log.error("FILENAME: " + filename);
-	size_t slash_pos = filename.find_last_of("/\\");
-	size_t from_pos = (slash_pos == std::string::npos) ? 0 : slash_pos + 1;
-	size_t dot_pos = filename.find('.', from_pos);
+	std::size_t slash_pos = filename.find_last_of("/\\");
+	std::size_t from_pos = (slash_pos == std::string::npos) ? 0 : slash_pos + 1;
+	std::size_t dot_pos = filename.find('.', from_pos);
 
-	// size_t dot = filename.find('.');
 	if (dot_pos == std::string::npos) return "";
 
 	return filename.substr(dot_pos);
-	// return ".bongo";
 
 }
 
-bool promoteFile(HTTPRequest& request) {
+void promoteFile(HTTPRequest& request) {
 
 	std::string old_path;
 	std::string extension;
 	if (request.is_multipart) {
 		close(request.body.parts.back().file);
 		old_path = request.body.parts.back().path;
-		// extension = request.body.parts.back().extension;
 		extension = extraxtExtension(request.body.parts.back().filename);
-		log.error("EXTENSION:" + extension);
 	} else {
 		close(request.body.file);
 		old_path = request.body.path;
-		// extension = request.body.extension;
 		extension = extraxtExtension(request.body.filename);
-		log.error("EXTENSION:" + extension);
 	}
-	log.error("old path: " + old_path);
 
+	std::string suffix;
+	std::time_t timestamp = std::time(NULL);
+	try {
+		suffix = randomHexString(SUFFIX_BYTE_WIDTH);
+	} catch (std::exception& e) {
+		log.warn("random hex string generator: " + std::string(e.what()));
+		std::stringstream oss;
+		oss << timestamp + std::time(NULL);
+		suffix = oss.str();
+	}
 	std::string new_path;
 	if (request.resolved.method == POST) {
-		const std::string& path = request.resolved.path;
+		const std::string& path = request.resolved.filepath;
 		const Config::Location& location = *request.resolved.location;
-		new_path = path + location.upload_dir + "/upload-" + randomHexString(7) + extension;
+		new_path = path + location.upload_dir + "/upload-" + suffix + extension;
 	} else if (request.resolved.method == PUT) {
-		const std::string& path = request.resolved.path;
-		log.notice("resolved path: " + request.resolved.path);
-		new_path = path;
+		new_path = request.resolved.filepath;
 	} else {
-		new_path = old_path + "." + randomHexString(7) + extension;
+		new_path = old_path + "." + suffix + extension;
 	}
-	log.error("new path: " + new_path);
+	log.debug("new path: " + new_path);
 
 	if (std::rename(old_path.c_str(), new_path.c_str()) != 0) {
 		log.warn("dispatch error: " + std::string(strerror(errno)));
-		// return INTERNAL_SERVER_ERROR;
-		return false;
+		return;
 	}
 
-	return true;
+	if (request.is_multipart) {
+		request.body.parts.back().path = new_path;
+	} else {
+		request.body.path = new_path;
+	}
+
+	return;
 
 }
 
-// for (std::vector<Config::Socket>::const_iterator soc_it = sockets.begin(); soc_it != sockets.end(); ++soc_it) {
-// for (std::vector<Config::Domain>::const_iterator dom_it = soc_it->domains.begin(); dom_it != soc_it->domains.end(); ++dom_it) {
-// for (std::vector<Config::Location>::const_iterator location = server->locations.begin(); location != server->locations.end(); ++location) {
+ssize_t fetchNbuff(int fd, Buffer& buffer) {
+	ssize_t bytes_read = buffer.fetchData(fd);
+	return bytes_read;
+}
 
-// bool includesHeader(std::map<std::string, std::string> headers, const std::string& key) {
-// 	return headers.find(key) != headers.end();
-// }
+ssize_t buffNflush(std::istream& stream, Buffer& b, int fd, bool is_pipe) {
+
+	// Fill buffer if not saturated and stream has not reached EOF
+	if (!stream.eof() && b.end < b.data.size()) {
+		stream.read(&b.data[b.end], b.data.size() - b.end);
+		std::streamsize bytes_read = stream.gcount();
+		if (bytes_read > 0) b.end += static_cast<std::size_t>(bytes_read);
+	}
+
+	// Send/write pending bytes
+	ssize_t n = b.flushData(fd, is_pipe);
+	if (n < 0) return n;
+
+	// Everything has been sent/written; reset indices
+	if (b.begin == b.end) {
+		b.reset();
+
+	// Compact buffer if needed
+	} else if (b.end == b.data.size()) {
+
+		if (b.begin > 0) {
+			b.compact();
+		} else {
+			throw std::runtime_error("client_" + i2a(fd) + ": buffer overflow");
+		}
+	}
+	return n;
+}
 
 void dumpConfigs(const std::vector<Config::Socket>& sockets) {
-	for (size_t i = 0; i < sockets.size(); ++i) {
+	for (std::size_t i = 0; i < sockets.size(); ++i) {
 		std::cout << "socket {\n";
 		std::cout << "\thost: " << sockets[i].address << ";\n";
 		std::cout << "\tport: " << sockets[i].port << ";\n";
 		std::cout << "\tclient_max_body_size: " << sockets[i].client_max_body_size << ";\n";
-		for (size_t j = 0; j < sockets[i].domains.size(); ++j) {
+		for (std::size_t j = 0; j < sockets[i].domains.size(); ++j) {
 			std::cout << "\tdomain {\n";
 			std::cout << "\t\tnames: [";
-			for (size_t k = 0; k < sockets[i].domains[j].names.size(); ++k) {
+			for (std::size_t k = 0; k < sockets[i].domains[j].names.size(); ++k) {
 				std::cout << sockets[i].domains[j].names[k];
 				if (k < sockets[i].domains[j].names.size() - 1) std::cout << ", ";
 			}
 			std::cout << "];\n";
 			std::cout << "\t\troot: " << sockets[i].domains[j].root << ";\n";
 			std::cout << "\t\tindex_files: [";
-			for (size_t k = 0; k < sockets[i].domains[j].index_files.size(); ++k) {
+			for (std::size_t k = 0; k < sockets[i].domains[j].index_files.size(); ++k) {
 				std::cout << sockets[i].domains[j].index_files[k];
 				if (k < sockets[i].domains[j].index_files.size() - 1) std::cout << ", ";
 			}
@@ -512,14 +455,14 @@ void dumpConfigs(const std::vector<Config::Socket>& sockets) {
 			}
 			std::cout << "\t\t}\n";
 			std::cout << "\t\tclient_max_body_size: " << sockets[i].domains[j].client_max_body_size << ";\n";
-			for (size_t k = 0; k < sockets[i].domains[j].locations.size(); ++k) {
+			for (std::size_t k = 0; k < sockets[i].domains[j].locations.size(); ++k) {
 				std::cout << "\t\tlocation {\n";
 				std::cout << "\t\t\tpath " << sockets[i].domains[j].locations[k].path << ";\n";
 				std::cout << "\t\t\troot: " << sockets[i].domains[j].locations[k].root << ";\n";
 				std::cout << "\t\t\talias: " << sockets[i].domains[j].locations[k].alias << ";\n";
 				std::cout << "\t\t\tredirect: " << sockets[i].domains[j].locations[k].redirect << ";\n";
 				std::cout << "\t\t\tmethods: [";
-				for (size_t l = 0; l < sockets[i].domains[j].locations[k].methods.size(); ++l) {
+				for (std::size_t l = 0; l < sockets[i].domains[j].locations[k].methods.size(); ++l) {
 					std::string method;
 					switch(sockets[i].domains[j].locations[k].methods[l]) {
 						case GET: method = "GET"; break;
@@ -534,7 +477,7 @@ void dumpConfigs(const std::vector<Config::Socket>& sockets) {
 				std::cout << "];\n";
 				std::cout << "\t\t\tautoindex: " << (sockets[i].domains[j].locations[k].autoindex ? "on" : "off") << ";\n";
 				std::cout << "\t\t\tindex files: [";
-				for (size_t l = 0; l < sockets[i].domains[j].locations[k].index_files.size(); ++l) {
+				for (std::size_t l = 0; l < sockets[i].domains[j].locations[k].index_files.size(); ++l) {
 					std::cout << sockets[i].domains[j].locations[k].index_files[l];
 						if (l < sockets[i].domains[j].locations[k].index_files.size() - 1) std::cout << ", ";
 				}
@@ -547,18 +490,6 @@ void dumpConfigs(const std::vector<Config::Socket>& sockets) {
 				std::cout << "\t\t\t}\n";
 				std::cout << "\t\t\tupload_dir: " << sockets[i].domains[j].locations[k].upload_dir << ";\n";
 				std::cout << "\t\t\tclient_max_body_size: " << sockets[i].domains[j].locations[k].client_max_body_size << ";\n";
-				// std::cout << "\t\t\tcgi_extension: [";
-				// for (size_t l = 0; l < sockets[i].domains[j].locations[k].cgi_extensions.size(); ++l) {
-				// 	std::cout << sockets[i].domains[j].locations[k].cgi_extensions[l];
-				// 	if (l < sockets[i].domains[j].locations[k].cgi_extensions.size() - 1) std::cout << ", ";
-				// }
-				// std::cout << "];\n";
-				// std::cout << "\t\t\tcgi_path: [";
-				// for (size_t l = 0; l < sockets[i].domains[j].locations[k].cgi_paths.size(); ++l) {
-				// 	std::cout << sockets[i].domains[j].locations[k].cgi_paths[l];
-				// 	if (j < location->cgi_paths.size() - 1) std::cout << ", ";
-				// }
-				// std::cout << "];\n";
 				std::cout << "\t\t\tinterpreters: {\n";
 				for (std::map<std::string, std::string>::const_iterator it = sockets[i].domains[j].locations[k].interpreters.begin();
 					 it != sockets[i].domains[j].locations[k].interpreters.end(); ++it) {
@@ -566,12 +497,120 @@ void dumpConfigs(const std::vector<Config::Socket>& sockets) {
 				}
 				std::cout << "\t\t\t};\n";
 				std::cout << "\t\t}\n";
-				// if (k < sockets[i].domains[j].locations.size() - 1) std::cout << "\t\tlocation {\n";
 			}
 			std::cout << "\t}\n";
-			// if (j < sockets[i].domains.size() - 1) std::cout << "\tdomain {\n";
 		}
 		std::cout << "}\n";
 	}
 	return;
+}
+
+/*
+ * ================================================================
+ * ASCII helpers
+ * ================================================================
+ */
+
+static char tolowerASCII(char c) {
+
+	unsigned char uc = static_cast<unsigned char>(c);
+
+	if (uc >= static_cast<unsigned char>('A') &&
+		uc <= static_cast<unsigned char>('Z')) {
+
+		uc = static_cast<unsigned char>(
+			uc + ('a' - 'A'));
+	}
+
+	return static_cast<char>(uc);
+
+}
+
+std::string tolowerASCII(const std::string& s) {
+
+	std::string result(s);
+
+	std::size_t i;
+
+	for (i = 0; i < result.size(); ++i) {
+		result[i] = tolowerASCII(result[i]);
+	}
+
+	return result;
+
+}
+
+int hexDigitValue(char c) {
+
+	if (c >= '0' && c <= '9') return c - '0';
+	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+	return -1;
+
+}
+
+/*
+* RFC 9110:
+*
+* tchar = "!" / "#" / "$" / "%" / "&" / "'"
+*       / "*" / "+" / "-" / "." / "^" / "_"
+*       / "`" / "|" / "~" / DIGIT / ALPHA
+*/
+bool isTChar(char c) {
+	unsigned char uc = static_cast<unsigned char>(c);
+	if ((uc >= 'A' && uc <= 'Z') ||
+		(uc >= 'a' && uc <= 'z') ||
+		(uc >= '0' && uc <= '9')) {
+		return true;
+	}
+
+	switch (uc) {
+
+	case '!':
+	case '#':
+	case '$':
+	case '%':
+	case '&':
+	case '\'':
+	case '*':
+	case '+':
+	case '-':
+	case '.':
+	case '^':
+	case '_':
+	case '`':
+	case '|':
+	case '~':
+		return true;
+
+	default:
+		return false;
+	}
+
+}
+
+bool isHexDigit(char c) {
+	return (c >= '0' && c <= '9') ||
+	(c >= 'A' && c <= 'F') ||
+	(c >= 'a' && c <= 'f');
+}
+
+bool equalCI(const std::string& a,
+			 const std::string& b) {
+	if (a.size() != b.size()) {
+		return false;
+	}
+
+	std::size_t i;
+
+	for (i = 0; i < a.size(); ++i) {
+
+		if (tolowerASCII(a[i]) !=
+			tolowerASCII(b[i])) {
+
+			return false;
+		}
+	}
+
+	return true;
 }

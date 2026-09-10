@@ -18,33 +18,35 @@
 #include <cstddef>
 #include <sys/types.h>
 
-static const size_t BUFFER_SIZE = 4 * 1024;
+static const std::size_t BUFFER_SIZE = 4 * 1024;
 
 struct Buffer {
 
 	std::vector<char> data;
-	size_t begin;
-	size_t mark;
-	size_t end;
-
-	// std::vector<char>::const_iterator begin_it = data.begin() + begin;
-	// std::vector<char>::const_iterator end_it = data.begin() + end;
+	std::size_t begin;
+	std::size_t mark;
+	std::size_t end;
 
 	std::string str(void) const;
-	std::string substr(ssize_t begin) const;
-	std::string substr(ssize_t begin, ssize_t end) const;
+	std::string substr(size_t begin) const;
+	std::string substr(size_t begin, std::size_t end) const;
 
 	void sstream(std::stringstream& ss) const;
-	void sstream(std::stringstream& ss, ssize_t begin) const;
-	void sstream(std::stringstream& ss, ssize_t begin, ssize_t end) const;
+	void sstream(std::stringstream& ss, std::size_t begin) const;
+	void sstream(std::stringstream& ss, std::size_t begin, std::size_t end) const;
 
 	void reset(void);
 	void compact(void);
 
-	size_t range(void) const;
+	std::size_t range(void) const;
 
 	ssize_t find(const char& pin) const;
 	ssize_t find(const std::string& needle) const;
+
+	// is_pipe picks read()/write() instead of recv()/send() -- recv/send
+	// only work on sockets, pipes need the plain syscalls (ENOTSOCK otherwise)
+	ssize_t fetchData(int fd, bool is_pipe = false);
+	ssize_t flushData(int fd, bool is_pipe = false);
 
 	Buffer(void) : begin(0), mark(0), end(0) {data.resize(BUFFER_SIZE);}
 
