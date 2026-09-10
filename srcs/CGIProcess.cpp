@@ -112,7 +112,7 @@ bool CGIProcess::spawn() {
     _stdout_fd = _out_pipe[0];
     _in_pipe[1] = -1;  // ownership to _stdin_fd
     _out_pipe[0] = -1; // ownership to _stdout_fd
-    _deadline = time(NULL) + CGI_TIMEOUT_S;
+    _deadline = std::time(NULL) + CGI_TIMEOUT_S;
 
     return true;
 }
@@ -151,7 +151,7 @@ void CGIProcess::closeStdout() {
 
 
 ssize_t CGIProcess::queueIncomingData(int fd) {
-	ssize_t bytes_read = fetchNbuff(fd, _outstream);
+    ssize_t bytes_read = _outstream.fetchData(fd, true);
 	return bytes_read;
 }
 
@@ -172,7 +172,7 @@ void CGIProcess::writeStdin() {
 	ssize_t written = _instream.flushData(stdinFd(), true);
 
 	// poll() already told us this fd is ready; treat any -1 as fatal,
-	// same as Server::handleSocketReadEvent() does for sockets. Not
+	// same as Server::_handleSocketReadEvent() does for sockets. Not
 	// allowed to branch on errno's value to decide what to do next.
 	if (written == -1) {
 		_state = ERROR;
@@ -356,7 +356,7 @@ void CGIProcess::buildResponse(HTTPResponse& response, bool headers_only) const 
 bool  CGIProcess::wantsWrite() const { return _stdin_fd != -1; }
 bool  CGIProcess::wantsRead()  const { return _stdout_fd != -1; }
 bool  CGIProcess::isDone()     const { return _stdin_fd == -1 && _stdout_fd == -1 && _reaped; }
-bool  CGIProcess::isExpired(time_t now) const { return _pid != -1 && now >= _deadline; }
+bool  CGIProcess::isExpired(const std::time_t now) const { return _pid != -1 && now >= _deadline; }
 
 // deprecated
 // void CGIProcess::handleWritable() {
@@ -508,7 +508,7 @@ CGIResult run_cgi(const std::string& path, const std::vector<std::string>& args,
             break;
         }
         if (ready == 0) {
-            if (proc.isExpired(time(NULL)))
+            if (proc.isExpired(std::time(NULL)))
                 proc.forceKill();
             continue;
         }

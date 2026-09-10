@@ -36,41 +36,45 @@ struct ListeningSocket {
 class Server {
 
 public:
-	static Server&							instance(void);
 
-	bool									setNonblockFlag(int fd);
-	bool									setRDWRInterest(int fd);
-	bool									dropWriteInterest(int fd);
-	bool									setPollInterest(int fd, bool is_pipe = false);
-	bool									setRDONLYInterest(int fd, bool is_pipe = false);
-	bool									setWRONLYInterest(int fd, bool is_pipe = false);
+	static Server&							instance(void);
 
 	void									prepareEPollInstance(void);
 	void									prepareListeningPort(const Config::Socket& config);
 	void									handleEvents(void);
-	void									acceptConnectRequest(int fd, ListeningSocket socket);
-	void									handleSocketError(int fd, std::map<int, Client*>::iterator it);
-	// void									handleSocketHangup(int fd);
-	// void									handleRemoteHangup(int fd);
-
-	bool									handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it);
-
-	void									handlePipeReadEvent(int fd, std::map<int, Client*>::iterator it);
-	void									handleSocketWriteEvent(int fd, std::map<int, Client*>::iterator it);
-	void									handlePipeWriteEvent(int fd, std::map<int, Client*>::iterator it);
-
-	void									cleanUpAllRessources(void);
-	void									cleanUpClient(std::map<int, Client*>::iterator it);
-	void									cleanUpSocket(std::map<int, ListeningSocket>::iterator it);
 
 private:
+
 	Server(void);
 	~Server(void);
 	Server(const Server& other);
 	Server& operator = (const Server& other);
 
-	static const int						MAX_EPOLL_EVENTS = 64; // 64 - 512
-	static const int						EPOLL_WAIT_TIMEOUT_MS = 5000; // 100 – 5000
+	bool									_setNonblockFlag(int fd);
+	bool									_setRDWRInterest(int fd);
+	bool									_dropWriteInterest(int fd);
+	bool									_setPollInterest(int fd, bool is_pipe = false);
+	bool									_setRDONLYInterest(int fd, bool is_pipe = false);
+	bool									_setWRONLYInterest(int fd, bool is_pipe = false);
+
+	void									_acceptConnectRequest(int fd, ListeningSocket socket);
+	void									_handleSocketError(int fd, std::map<int, Client*>::iterator it);
+
+	bool									_handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it);
+
+	void									_handlePipeReadEvent(int fd, std::map<int, Client*>::iterator it);
+	void									_handleSocketWriteEvent(int fd, std::map<int, Client*>::iterator it);
+	void									_handlePipeWriteEvent(int fd, std::map<int, Client*>::iterator it);
+
+	void									_staleClientReaper(const std::time_t now);
+
+	void									_cleanUpAllRessources(void);
+	void									_cleanUpClient(std::map<int, Client*>::iterator it);
+	void									_cleanUpSocket(std::map<int, ListeningSocket>::iterator it);
+
+	static const unsigned short				MAX_EPOLL_EVENTS = 64; // 64 - 512
+	static const unsigned short				EPOLL_WAIT_TIMEOUT_MS = 5000; // 100 - 5000
+	static const unsigned short				STALE_CLIENT_SWEEP_INTERVAL = 2;
 
 	int										_epfd;
 
@@ -79,9 +83,14 @@ private:
 	// std::map<int, const Config::Socket*>	_sockets;
 	std::map<int, ListeningSocket>			_sockets;
 	std::map<int, Client*>					_clients;
-	std::map<int, Client*>					_outputs;
+	// std::map<int, CGIProcess*>				_scripts;
+	// std::map<CGIProcess*, HTTPRequest*>		_dunno;
+	// std::map<HTTPRequest*, Client*>			_Idunno;
+	std::map<int, Client*>					_scripts;
 
 	epoll_event								_events[MAX_EPOLL_EVENTS];
+
+	std::time_t								_last_sweep;
 
 };
 

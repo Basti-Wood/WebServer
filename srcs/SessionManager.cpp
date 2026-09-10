@@ -39,7 +39,7 @@ static const std::string setUpCookieHeader(const std::string& session_id, const 
 
 void SessionManager::getSession(Client& client) {
 
-	const time_t now = std::time(NULL);
+	const std::time_t now = std::time(NULL);
 
 	HTTPResponse& response = client.getCurrentResponse();
 	HTTPRequest& request = client.getCurrentRequest();

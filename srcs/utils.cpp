@@ -17,12 +17,13 @@
 #include <sys/stat.h>	// stat
 #include <unistd.h>
 #include <fcntl.h>
-#include <iostream>
-#include <climits>		// for USHRT_MAX, INT_MIN, INT_MAX
-#include <cstring>
-#include <cstdlib>
-#include <cstdio>
 #include <vector>
+#include <iostream>
+#include <cstdlib>
+#include <cstddef>
+#include <cstring>
+#include <climits>		// for USHRT_MAX, INT_MIN, INT_MAX
+#include <cstdio>
 
 // DEBUG BEGIN
 void warnHighEventLoad(int nfds, int max_capacity) {
@@ -225,7 +226,7 @@ std::string unquote(const std::string& str) {
 	return str;
 }
 
-std::string randomHexString(std::size_t byte_width) {
+std::string randomHexString(unsigned short byte_width) {
 
 	static const char hex[] = "0123456789abcdef";
 
@@ -245,9 +246,9 @@ std::string randomHexString(std::size_t byte_width) {
 		}
 
 		std::string result;
-		result.reserve(byte_width * 2);
+		result.reserve(static_cast<std::size_t>(byte_width) * 2);
 
-		for (std::size_t i = 0; i < byte_width; ++i) {
+		for (std::size_t i = 0; i < static_cast<std::size_t>(byte_width); ++i) {
 			result += hex[bytes[i] >> 4];
 			result += hex[bytes[i] & 0x0f];
 		}
@@ -259,7 +260,7 @@ std::string randomHexString(std::size_t byte_width) {
 		delete [] bytes;
 		log.error("hexgen: " + std::string(e.what()) + ". Falling back to std::rand");
 		std::string unique_id;
-		while (unique_id.empty() || unique_id.size() < byte_width * 2) {
+		while (unique_id.empty() || unique_id.size() < static_cast<std::size_t>(byte_width) * 2) {
 			unique_id += i2a(std::rand());
 		}
 		return unique_id;
@@ -297,7 +298,7 @@ void createFile(HTTPRequest& request) {
 	std::string suffix;
 	int file_descriptor;
 	unsigned short count = 0;
-	std::time_t timestamp = std::time(NULL);
+	const std::time_t timestamp = std::time(NULL);
 	do {
 		try {
 			suffix = randomHexString(TEMPORARY_SUFFIX_BYTE_WIDTH);
@@ -357,7 +358,7 @@ void promoteFile(HTTPRequest& request) {
 	}
 
 	std::string suffix;
-	std::time_t timestamp = std::time(NULL);
+	const std::time_t timestamp = std::time(NULL);
 	try {
 		suffix = randomHexString(SUFFIX_BYTE_WIDTH);
 	} catch (std::exception& e) {
@@ -391,40 +392,6 @@ void promoteFile(HTTPRequest& request) {
 
 	return;
 
-}
-
-ssize_t fetchNbuff(int fd, Buffer& buffer) {
-	ssize_t bytes_read = buffer.fetchData(fd);
-	return bytes_read;
-}
-
-ssize_t buffNflush(std::istream& stream, Buffer& b, int fd, bool is_pipe) {
-
-	// Fill buffer if not saturated and stream has not reached EOF
-	if (!stream.eof() && b.end < b.data.size()) {
-		stream.read(&b.data[b.end], b.data.size() - b.end);
-		std::streamsize bytes_read = stream.gcount();
-		if (bytes_read > 0) b.end += static_cast<std::size_t>(bytes_read);
-	}
-
-	// Send/write pending bytes
-	ssize_t n = b.flushData(fd, is_pipe);
-	if (n < 0) return n;
-
-	// Everything has been sent/written; reset indices
-	if (b.begin == b.end) {
-		b.reset();
-
-	// Compact buffer if needed
-	} else if (b.end == b.data.size()) {
-
-		if (b.begin > 0) {
-			b.compact();
-		} else {
-			throw std::runtime_error("client_" + i2a(fd) + ": buffer overflow");
-		}
-	}
-	return n;
 }
 
 void dumpConfigs(const std::vector<Config::Socket>& sockets) {

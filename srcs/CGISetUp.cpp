@@ -97,6 +97,7 @@ StatusCode setUpCGI(Client& client) {
 														   request.resolved.filepath);
 
 	client.cgi_process = new CGIProcess(request.cgi.binary_path, cgi_args, env, working_dir);
+	// CGIProcess* cgi_process = new CGIProcess(request.cgi.binary_path, cgi_args, env, working_dir);
 
 	if (!client.cgi_process->valid()) {
 		log.error("cgi: failed to open pipes for " + request.cgi.binary_path);
@@ -107,6 +108,8 @@ StatusCode setUpCGI(Client& client) {
 		log.error("cgi: failed to spawn " + request.cgi.binary_path);
 		return INTERNAL_SERVER_ERROR;
 	}
+
+	// client.process_queue.push_back(cgi_process);
 
 	// epoll registration is still ahead, server side
 	return NO_STATUS;

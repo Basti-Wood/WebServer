@@ -28,7 +28,7 @@ public:
 
 	const std::vector<std::string>&					getAttributes(void) const;
 
-	time_t											getExpirationTime(void) const;
+	const std::time_t								getExpirationTime(void) const;
 
 	void											uptdateTimeStamp(void);
 	void											setAttribute(const std::string& attribute);
@@ -40,9 +40,9 @@ private:
 
 	std::vector<std::string>						_attributes;
 
-	time_t											_createdAt;
-	time_t											_touchedAt;
-	time_t											_expiresAt;
+	std::time_t										_createdAt;
+	std::time_t										_touchedAt;
+	std::time_t										_expiresAt;
 
 };
 

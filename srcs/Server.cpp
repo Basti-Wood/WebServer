@@ -49,7 +49,7 @@ Server& Server::instance(void) {
 	return instance;
 }
 
-bool Server::setNonblockFlag(int fd) {
+bool Server::_setNonblockFlag(int fd) {
 
 	int flags = fcntl(fd, F_GETFL);
 	if (flags == -1) {
@@ -68,7 +68,7 @@ bool Server::setNonblockFlag(int fd) {
 	return true;
 }
 
-bool Server::setRDWRInterest(int fd) {
+bool Server::_setRDWRInterest(int fd) {
 
 	epoll_event e;
 	e.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP;
@@ -84,7 +84,7 @@ bool Server::setRDWRInterest(int fd) {
 	return true;
 }
 
-bool Server::dropWriteInterest(int fd) {
+bool Server::_dropWriteInterest(int fd) {
 
 	epoll_event e;
 	e.events = EPOLLRDHUP;
@@ -100,7 +100,7 @@ bool Server::dropWriteInterest(int fd) {
 	return true;
 }
 
-bool Server::setPollInterest(int fd, bool is_pipe) {
+bool Server::_setPollInterest(int fd, bool is_pipe) {
 
 	epoll_event e;
 	e.data.fd = fd;
@@ -119,7 +119,7 @@ bool Server::setPollInterest(int fd, bool is_pipe) {
 	return true;
 }
 
-bool Server::setRDONLYInterest(int fd, bool is_pipe) {
+bool Server::_setRDONLYInterest(int fd, bool is_pipe) {
 
 	epoll_event e;
 	e.data.fd = fd;
@@ -139,7 +139,7 @@ bool Server::setRDONLYInterest(int fd, bool is_pipe) {
 	return true;
 }
 
-bool Server::setWRONLYInterest(int fd, bool is_pipe) {
+bool Server::_setWRONLYInterest(int fd, bool is_pipe) {
 
 	epoll_event e;
 	e.data.fd = fd;
@@ -221,7 +221,7 @@ void Server::prepareListeningPort(const Config::Socket& soc) {
 		throw std::runtime_error("listen: " + std::string(strerror(errno)));
 	}
 
-	if (!setPollInterest(_sockets.rbegin()->first)) {
+	if (!_setPollInterest(_sockets.rbegin()->first)) {
 		throw std::runtime_error("epoll_ctl: " + std::string(strerror(errno)));
 	}
 
@@ -266,32 +266,32 @@ void Server::handleEvents(void) {
 
 			std::map<int, ListeningSocket>::const_iterator listen_socket = _sockets.find(fd);
 			if (listen_socket != _sockets.end() && events & EPOLLIN) {
-				acceptConnectRequest(listen_socket->first, listen_socket->second);
+				_acceptConnectRequest(listen_socket->first, listen_socket->second);
 			}
 
 			std::map<int, Client*>::iterator client_socket = _clients.find(fd);
 			if (client_socket != _clients.end()) {
 
 				if (events & EPOLLERR)
-					handleSocketError(fd, client_socket);
+					_handleSocketError(fd, client_socket);
 				else if (events & EPOLLHUP)
-					cleanUpClient(client_socket);
+					_cleanUpClient(client_socket);
 				else if (events & EPOLLRDHUP)
-					cleanUpClient(client_socket);
+					_cleanUpClient(client_socket);
 				else if (events & EPOLLIN)
-					tcp_peer_alive = handleSocketReadEvent(fd, client_socket);
+					tcp_peer_alive = _handleSocketReadEvent(fd, client_socket);
 
 				if (tcp_peer_alive && (events & EPOLLOUT))
-					handleSocketWriteEvent(fd, client_socket);
+					_handleSocketWriteEvent(fd, client_socket);
 			}
 
-			std::map<int, Client*>::iterator script_output = _outputs.find(fd);
-			if (script_output != _outputs.end()) {
+			std::map<int, Client*>::iterator script_fd = _scripts.find(fd);
+			if (script_fd != _scripts.end()) {
 
 				if (events & EPOLLIN)
-					handlePipeReadEvent(fd, script_output);
+					_handlePipeReadEvent(fd, script_fd);
 				else if (events & EPOLLOUT)
-					handlePipeWriteEvent(fd, script_output);
+					_handlePipeWriteEvent(fd, script_fd);
 
 				// TODO think if we should care about EPOLLERR (read end closed)
 				// and EPOLLHUP (write end closed / read end returns EOF anyway)
@@ -309,51 +309,16 @@ void Server::handleEvents(void) {
 			break;
 		}
 
-		std::map<int, Client*>::iterator immediate;
-		std::map<int, Client*>::iterator it = _clients.begin();
-		while (it != _clients.end()) {
-			immediate = it;
-			++it;
-
-			if (immediate->second->isTimedOut()) {
-
-				int fd = immediate->first;
-				Client& client = *immediate->second;
-// DEBUG BEGIN
-				log.debug("client_" + i2a(fd)
-				+ " idle time: " + i2a(client.getIdleTime()) + "s");
-// DEBUG END
-				log.warn("client_" + i2a(fd) + " timed out");
-
-				if (client.getState() == Client::RECEIVING_HEADERS) {
-					client.pushResponse();
-					dispatcher.buildErrorResponse(REQUEST_TIMEOUT,
-												  client.getCurrentRequest().resolved.location,
-												  client.getCurrentRequest().headers_only,
-												  client.getCurrentResponse());
-					client.setState(Client::PENDING_RESPONSE);
-					log.debug("client_" + i2a(fd) + ": state set to PENDING_RESPONSE");
-					client.popRequest();
-					if (!setWRONLYInterest(fd)) {
-						cleanUpClient(immediate);
-					} else {
-						client.markForTermination();
-					}
-				} else {
-					cleanUpClient(immediate);
-				}
-// DEBUG BEGIN
-				if (_clients.empty()) {
-					log.info("All clients disconnected");
-				}
-// DEBUG END
-			}
+		const std::time_t now = std::time(NULL);
+		if (std::difftime(now, _last_sweep) > STALE_CLIENT_SWEEP_INTERVAL) {
+			_staleClientReaper(now);
+			_last_sweep = now;
 		}
 	}
 	return;
 }
 
-void Server::acceptConnectRequest(int listen_fd, ListeningSocket socket) {
+void Server::_acceptConnectRequest(int listen_fd, ListeningSocket socket) {
 
 	log.info("New connection on socket fd_" + i2a(listen_fd));
 
@@ -368,27 +333,26 @@ void Server::acceptConnectRequest(int listen_fd, ListeningSocket socket) {
 
 		delete c;
 		return;
-
 	}
 
 	_clients[client_fd] = c;
 
-	if (!setNonblockFlag(client_fd)) {
-		cleanUpClient(_clients.find(client_fd));
+	if (!_setNonblockFlag(client_fd)) {
+		_cleanUpClient(_clients.find(client_fd));
 		return;
 	}
-	if (!setPollInterest(client_fd)) {
-		cleanUpClient(_clients.find(client_fd));
+	if (!_setPollInterest(client_fd)) {
+		_cleanUpClient(_clients.find(client_fd));
 		return;
 	}
 
 	log.info("client_" + i2a(client_fd) + ", endpoint "
 				+ c->getRemoteAddress() + ":" + i2a(c->getRemotePort()));
-	return;
 
+	return;
 }
 
-void Server::handleSocketError(int fd, std::map<int, Client*>::iterator it) {
+void Server::_handleSocketError(int fd, std::map<int, Client*>::iterator it) {
 
 	int error = 0;
 	socklen_t len = sizeof(error);
@@ -406,12 +370,12 @@ void Server::handleSocketError(int fd, std::map<int, Client*>::iterator it) {
 	// 	log.warn("client lookup:: " + std::string(NFIND_CLIENT));
 	// }
 
-	cleanUpClient(it);
+	_cleanUpClient(it);
 	return;
 
 }
 
-bool Server::handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it) {
+bool Server::_handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it) {
 
 	// std::map<int, Client*>::iterator it = _clients.find(fd);
  //
@@ -427,12 +391,12 @@ bool Server::handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it) 
 	if (bytes_received < 0) {
 
 		log.warn("recv: " + std::string(strerror(errno)));
-		cleanUpClient(it);
+		_cleanUpClient(it);
 		return false;
 
 	} else if (bytes_received == 0) {
 		log.info("Connection closed by client fd_" + i2a(fd));
-		cleanUpClient(it);
+		_cleanUpClient(it);
 		return false;
 
 	} else {
@@ -448,32 +412,32 @@ bool Server::handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it) 
 		}
 
 		// TEST
-		// register pipes and add them to _outputs
+		// register pipes and add them to _scripts
 		if (client.cgi_process != NULL) {
 
 			int std_in = client.cgi_process->stdinFd();
 			int std_out = client.cgi_process->stdoutFd();
 
-			if (!setPollInterest(std_in, true)) {
+			if (!_setPollInterest(std_in, true)) {
 				throw std::runtime_error("epoll_ctl: " + std::string(strerror(errno)));
 			}
-			if (!setNonblockFlag(std_in)) {
+			if (!_setNonblockFlag(std_in)) {
 				throw std::runtime_error("epoll_ctl: " + std::string(strerror(errno)));
 			}
-			if (!setWRONLYInterest(std_in, true)) {
-				cleanUpClient(it);
+			if (!_setWRONLYInterest(std_in, true)) {
+				_cleanUpClient(it);
 			}
-			_outputs[std_in] = &client;
-			if (!setPollInterest(std_out, true)) {
+			_scripts[std_in] = &client;
+			if (!_setPollInterest(std_out, true)) {
 				throw std::runtime_error("epoll_ctl: " + std::string(strerror(errno)));
 			}
-			if (!setNonblockFlag(std_out)) {
+			if (!_setNonblockFlag(std_out)) {
 				throw std::runtime_error("epoll_ctl: " + std::string(strerror(errno)));
 			}
-			if (!setRDONLYInterest(std_out, true)) {
-				cleanUpClient(it);
+			if (!_setRDONLYInterest(std_out, true)) {
+				_cleanUpClient(it);
 			}
-			_outputs[std_out] = &client;
+			_scripts[std_out] = &client;
 			// Returning here as we have to wait for pipe readyness to start writing to std_in.
 			return true;
 		}
@@ -493,12 +457,12 @@ bool Server::handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it) 
 			client.pushRequest();
 
 			if (client.blockedFromReceiving()) {
-				if (!setWRONLYInterest(fd)) {
-					cleanUpClient(it);
+				if (!_setWRONLYInterest(fd)) {
+					_cleanUpClient(it);
 				}
 			} else {
-				if (!setRDWRInterest(fd)) {
-					cleanUpClient(it);
+				if (!_setRDWRInterest(fd)) {
+					_cleanUpClient(it);
 				}
 			}
 		}
@@ -506,7 +470,7 @@ bool Server::handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it) 
 	}
 }
 
-void Server::handlePipeReadEvent(int fd, std::map<int, Client*>::iterator it) {
+void Server::_handlePipeReadEvent(int fd, std::map<int, Client*>::iterator it) {
 
 	Client& client = *it->second;
 
@@ -518,7 +482,7 @@ void Server::handlePipeReadEvent(int fd, std::map<int, Client*>::iterator it) {
 	return;
 }
 
-void Server::handleSocketWriteEvent(int fd, std::map<int, Client*>::iterator it) {
+void Server::_handleSocketWriteEvent(int fd, std::map<int, Client*>::iterator it) {
 
 	// std::map<int, Client*>::iterator it = _clients.find(fd);
  //
@@ -548,20 +512,20 @@ void Server::handleSocketWriteEvent(int fd, std::map<int, Client*>::iterator it)
 	switch (client.getState()) {
 
 	case Client::IDLE:
-		if (!setRDONLYInterest(fd)) {
-			cleanUpClient(it);
+		if (!_setRDONLYInterest(fd)) {
+			_cleanUpClient(it);
 		}
 		break;
 	case Client::ERROR:
-		cleanUpClient(it);
+		_cleanUpClient(it);
 		break;
 	case Client::REJECTED:
-		if (!dropWriteInterest(fd)) {
-			cleanUpClient(it);
+		if (!_dropWriteInterest(fd)) {
+			_cleanUpClient(it);
 		}
 		break;
 	case Client::CONCLUDED:
-		cleanUpClient(it);
+		_cleanUpClient(it);
 	default:
 		break;
 
@@ -570,7 +534,7 @@ void Server::handleSocketWriteEvent(int fd, std::map<int, Client*>::iterator it)
 	return;
 }
 
-void Server::handlePipeWriteEvent(int fd, std::map<int, Client*>::iterator it) {
+void Server::_handlePipeWriteEvent(int fd, std::map<int, Client*>::iterator it) {
 
 	(void)fd;
 	Client& client = *it->second;
@@ -582,7 +546,50 @@ void Server::handlePipeWriteEvent(int fd, std::map<int, Client*>::iterator it) {
 	return;
 }
 
-void Server::cleanUpAllRessources(void) {
+void Server::_staleClientReaper(const std::time_t now) {
+
+	std::map<int, Client*>::iterator immediate;
+	std::map<int, Client*>::iterator it = _clients.begin();
+	while (it != _clients.end()) {
+		immediate = it;
+		++it;
+
+		if (immediate->second->isTimedOut(now)) {
+
+			int fd = immediate->first;
+			Client& client = *immediate->second;
+// DEBUG BEGIN
+			log.debug("client_" + i2a(fd)
+			+ " idle time: " + i2a(client.getIdleTime()) + "s");
+// DEBUG END
+			log.warn("client_" + i2a(fd) + " timed out");
+
+			if (client.getState() == Client::RECEIVING_HEADERS) {
+				client.pushResponse();
+				dispatcher.buildErrorResponse(REQUEST_TIMEOUT,
+											client.getCurrentRequest().resolved.location,
+											client.getCurrentRequest().headers_only,
+											client.getCurrentResponse());
+				client.setState(Client::PENDING_RESPONSE);
+				log.debug("client_" + i2a(fd) + ": state set to PENDING_RESPONSE");
+				client.popRequest();
+				if (_setWRONLYInterest(fd)) {
+					client.markForTermination();
+					return;
+				}
+			}
+			_cleanUpClient(immediate);
+// DEBUG BEGIN
+			if (_clients.empty()) {
+				log.info("All clients disconnected");
+			}
+// DEBUG END
+		}
+	}
+
+}
+
+void Server::_cleanUpAllRessources(void) {
 
 	if (!_clients.empty()) {
 
@@ -592,7 +599,7 @@ void Server::cleanUpAllRessources(void) {
 		while (it != _clients.end()) {
 			immediate = it;
 			++it;
-			cleanUpClient(immediate);
+			_cleanUpClient(immediate);
 		}
 
 	}
@@ -606,7 +613,7 @@ void Server::cleanUpAllRessources(void) {
 		while (it != _sockets.end()) {
 			immediate = it;
 			++it;
-			cleanUpSocket(immediate);
+			_cleanUpSocket(immediate);
 		}
 
 	}
@@ -633,7 +640,7 @@ void Server::cleanUpAllRessources(void) {
 	return;
 }
 
-void Server::cleanUpClient(std::map<int, Client*>::iterator it) {
+void Server::_cleanUpClient(std::map<int, Client*>::iterator it) {
 
 	if (_epfd != -1) {
 		log.debug("Removing fd " + i2a(it->first) + " (client) from epoll instance");
@@ -660,7 +667,7 @@ void Server::cleanUpClient(std::map<int, Client*>::iterator it) {
 
 }
 
-void Server::cleanUpSocket(std::map<int, ListeningSocket>::iterator it) {
+void Server::_cleanUpSocket(std::map<int, ListeningSocket>::iterator it) {
 
 	if (_epfd != -1) {
 		log.debug("Removing fd " + i2a(it->first) + " (socket) from epoll instance");
@@ -686,7 +693,7 @@ void Server::cleanUpSocket(std::map<int, ListeningSocket>::iterator it) {
 //~~~~~~~~~~~//
 
 /*	@brief Constructor	*/
-Server::Server(void) {
+Server::Server(void) : _last_sweep(std::time(NULL)) {
 	log.debug("Server Constructor called");
 	_epfd = -1;
 	return;
@@ -697,7 +704,7 @@ Server::~Server(void) {
 	log.debug("Server Destructor called");
 	// if (_epfd != -1 || !_sockfd.empty() || !_clients.empty()) {
 	if (_epfd != -1 || !_sockets.empty() || !_clients.empty()) {
-		cleanUpAllRessources();
+		_cleanUpAllRessources();
 	}
 	return;
 }

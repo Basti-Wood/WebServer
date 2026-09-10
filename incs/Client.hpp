@@ -72,7 +72,7 @@ public:
 	};
 
 	CGIProcess*						cgi_process; // owns the live CGI child while one is running (NULL otherwise)
-
+	// std::deque<CGIProcess*>			process_queue;
 
 // DEBUG BEGIN
 	double							getIdleTime(void) const;
@@ -93,7 +93,7 @@ public:
 	const Config::Socket&			getConfig(void) const;
 
 	HTTPRequest&					getCurrentRequest(void);
-	HTTPRequest&					getRecentRequest(void);
+	// HTTPRequest&					getRecentRequest(void);
 
 	HTTPResponse&					getCurrentResponse(void);
 
@@ -104,7 +104,7 @@ public:
 	bool							hasPendingResponse(void) const;
 	bool							blockedFromReceiving() const;
 	bool							markedForTermination() const;
-	bool							isTimedOut(void) const;
+	bool							isTimedOut(const std::time_t now) const;
 
 	ssize_t							queueIncomingData(int fd);
 
@@ -113,23 +113,25 @@ public:
 	void							sendDataToTCPPeer(int fd);		// send response to peer
 	void							pushRequest(void);
 	void							pushResponse(void);
+	void							popProcess(void);
 	void							popRequest(void);
 	void							popResponse(void);
 	void							blockFromReceiving(void);
 	void							markForTermination(void);
 	void							reset(void);
 
-
 private:
 
 	Client(const Client& other);
 	Client& operator = (const Client& other);
 
-	static const time_t				IDLE_TIMEOUT_SECONDS		= 60;
-	static const time_t				HEADER_TIMEOUT_SECONDS		= 12;
-	static const time_t				BODY_TIMEOUT_SECONDS		= 120;
-	static const time_t				PROCESSING_TIMEOUT_SECONDS	= 420;
-	static const time_t				REJECTED_TIMEOUT_SECONDS	= 10;
+	static const unsigned short		REQUEST_ID_BYTE_WIDTH = 6;
+
+	static const std::time_t		IDLE_TIMEOUT_SECONDS		= 60;
+	static const std::time_t		HEADER_TIMEOUT_SECONDS		= 12;
+	static const std::time_t		BODY_TIMEOUT_SECONDS		= 120;
+	static const std::time_t		PROCESSING_TIMEOUT_SECONDS	= 420;
+	static const std::time_t		REJECTED_TIMEOUT_SECONDS	= 10;
 
 	State							_state;
 
@@ -150,7 +152,7 @@ private:
 
 	Response						_response;
 
-	time_t							_last_event;
+	std::time_t						_last_event;
 
 	std::size_t						_adjustBufferSize(std::size_t payload_size);
 

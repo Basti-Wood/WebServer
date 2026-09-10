@@ -36,7 +36,7 @@ const std::vector<std::string>& Session::getAttributes(void) const {
 	return _attributes;
 }
 
-time_t Session::getExpirationTime(void) const {
+const std::time_t Session::getExpirationTime(void) const {
 	return _expiresAt;
 }
 

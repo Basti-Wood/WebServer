@@ -87,18 +87,20 @@ Client::~Client(void) {
 	}
 
 	delete cgi_process;
-
+	// while (!process_queue.empty()) popProcess();
+	// process_queue.clear();
 	while (!_request_queue.empty()) popRequest();
-	 _request_queue.clear();
+	_request_queue.clear();
 	while (!_response_queue.empty()) popResponse();
-	 _request_queue.clear();
+	_request_queue.clear();
 
 	return;
 }
 
 // DEBUG BEGIN
 double Client::getIdleTime(void) const {
-	return (std::difftime(std::time(NULL), _last_event));
+	const std::time_t now = std::time(NULL);
+	return (std::difftime(now, _last_event));
 }
 
 unsigned short int Client::getRemotePort(void) const {
@@ -138,9 +140,9 @@ HTTPRequest& Client::getCurrentRequest(void) {
 	return *_request_queue.front();
 }
 
-HTTPRequest& Client::getRecentRequest(void) {
-	return *_request_queue.back();
-}
+// HTTPRequest& Client::getRecentRequest(void) {
+// 	return *_request_queue.back();
+// }
 
 HTTPResponse& Client::getCurrentResponse(void) {
 	return *_response_queue.front();
@@ -166,7 +168,7 @@ bool Client::markedForTermination(void) const {
 	return _marked_for_termination;
 }
 
-bool Client::isTimedOut(void) const {
+bool Client::isTimedOut(const std::time_t now) const {
 
 	std::time_t timeout = 0;
 	switch (_state) {
@@ -209,13 +211,11 @@ bool Client::isTimedOut(void) const {
 		return true;
 	}
 
-	const std::time_t now = std::time(NULL);
 	return std::difftime(now, _last_event) > timeout;
-
 }
 
 ssize_t Client::queueIncomingData(int fd) {
-	ssize_t bytes_read = fetchNbuff(fd, _instream);
+	ssize_t bytes_read = _instream.fetchData(fd);
 	if (bytes_read > 0) _last_event = std::time(NULL);
 	return bytes_read;
 }
@@ -223,6 +223,7 @@ ssize_t Client::queueIncomingData(int fd) {
 void Client::parseDataFromPeer(void) {
 
 	HTTPRequest& request = *_request_queue.back();
+	// CGIProcess* process = process_queue.back();
 
 	if (request.parsing.state == HTTPRequest::READING_BODY &&
 		_instream.data.size() == BUFFER_SIZE) {
@@ -394,6 +395,36 @@ void Client::queueOutgoingData(void) {
 	return;
 }
 
+static inline ssize_t buffNflush(std::istream& stream, Buffer& b, int fd) {
+
+	// Fill buffer if not saturated and stream has not reached EOF
+	if (!stream.eof() && b.end < b.data.size()) {
+		stream.read(&b.data[b.end], b.data.size() - b.end);
+		std::streamsize bytes_read = stream.gcount();
+		if (bytes_read > 0) b.end += static_cast<std::size_t>(bytes_read);
+	}
+
+	// Send/write pending bytes
+	ssize_t n = b.flushData(fd);
+	if (n < 0) return n;
+
+	// Everything has been sent/written; reset indices
+	if (b.begin == b.end) {
+		b.reset();
+
+	// Compact buffer if needed
+	} else if (b.end == b.data.size()) {
+
+		if (b.begin > 0) {
+			b.compact();
+		} else {
+			throw std::runtime_error("client_" + i2a(fd) + ": buffer overflow");
+		}
+	}
+
+	return n;
+}
+
 void Client::sendDataToTCPPeer(int fd) {
 
 	ssize_t bytes_sent = 0;
@@ -496,6 +527,7 @@ void Client::sendDataToTCPPeer(int fd) {
 			break;
 		}
 	}
+
 	return;
 }
 
@@ -516,6 +548,15 @@ void Client::pushResponse(void) {
 
 	return;
 }
+
+// Delete processed request from deque container
+// void Client::popProcess(void) {
+//
+// 	delete process_queue.front();
+// 	process_queue.pop_front();
+//
+// 	return;
+// }
 
 // Delete processed request from deque container
 void Client::popRequest(void) {
@@ -557,21 +598,12 @@ void Client::reset(void) {
 	std::memset(&_server_addr, 0, _addrlen);
 	std::memset(&_remote_addr, 0, _addrlen);
 
-	if (!_request_queue.empty()) {
-		while (_request_queue.begin() != _request_queue.end()) {
-			delete _request_queue.back();
-			_request_queue.pop_back();
-		}
-		_request_queue.clear();
-	}
-
-	if (!_response_queue.empty()) {
-		while (_response_queue.begin() != _response_queue.end()) {
-			delete _response_queue.front();
-			_response_queue.pop_front();
-		}
-		_response_queue.clear();
-	}
+	// while (!process_queue.empty()) popProcess();
+	// process_queue.clear();
+	while (!_request_queue.empty()) popRequest();
+	_request_queue.clear();
+	while (!_response_queue.empty()) popResponse();
+	_response_queue.clear();
 
 	_response.headers.clear();
 	_response.body.temp.clear();

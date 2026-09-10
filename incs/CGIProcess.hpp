@@ -63,7 +63,7 @@ public:
     void handleReadable(); // drain readable bytes until EAGAIN/EOF/error
     bool tryReap(bool block = false); // waitpid; sets exit code once reaped
 
-    bool isExpired(time_t now) const;
+    bool isExpired(const std::time_t now) const;
     void forceKill(); // SIGKILL; caller still needs to tryReap()
 
     CGIResult result() const;
@@ -102,7 +102,7 @@ private:
     // std::string _output;
     bool        _reaped;
     int         _exit_code;
-    time_t      _deadline;
+    std::time_t _deadline;
 
     Buffer      _instream;  // -> our stdin
     Buffer      _outstream; // <- our stdout
