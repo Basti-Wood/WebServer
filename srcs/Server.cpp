@@ -629,9 +629,9 @@ void Server::_handlePipeWriteEvent(std::map<int, Client*>::iterator it) {
 										  client.getCurrentRequest().headers_only,
 										  client.getCurrentResponse());
 			client.setState(Client::PENDING_RESPONSE);
-			log.debug("client_" + i2a(it->first) + ": state set to PENDING_RESPONSE");
+			log.debug("client_" + i2a(fd) + ": state set to PENDING_RESPONSE");
 			client.popRequest();
-			if (!_setWRONLYInterest(it->first)) {
+			if (!_setWRONLYInterest(fd)) {
 				_cleanUpClient(it);
 				return;
 			}
