@@ -521,18 +521,26 @@ void Server::_handlePipeReadEvent(std::map<int, Client*>::iterator it) {
 	} else if (bytes_read == 0) {
 
 		log.info("Script delivered full response via fd_" + i2a(fd));
-		client.setState(Client::PREPARING_RESPONSE);
+		_cleanUpScriptPipeEnd(it);
+		if (client.cgi_process->consumeAvailableOutput() == true) {
+			client.setState(Client::PREPARING_RESPONSE);
+		}
 
 	} else {
 
 		client.uptdateTimeStamp();
 		// TEST have CGIProcess consume the data in the buffer
 		if (client.cgi_process->consumeAvailableOutput() == true) {
-			client.cgi_process->buildResponse(client.getCurrentResponse(),
-											  client.getCurrentRequest().headers_only);
-			client.setState(Client::PENDING_RESPONSE);
+			log.info("Script delivered full response via fd_" + i2a(fd));
+			_cleanUpScriptPipeEnd(it);
+			client.setState(Client::PREPARING_RESPONSE);
 		}
+	}
 
+	if (client.getState() ==  Client::PREPARING_RESPONSE) {
+		client.cgi_process->buildResponse(client.getCurrentResponse(),
+										  client.getCurrentRequest().headers_only);
+		client.setState(Client::PENDING_RESPONSE);
 	}
 
 	return;
