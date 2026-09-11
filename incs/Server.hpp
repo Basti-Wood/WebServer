@@ -73,6 +73,8 @@ private:
 	void									_cleanUpClient(std::map<int, Client*>::iterator it);
 	void									_cleanUpSocket(std::map<int, ListeningSocket>::iterator it);
 
+	bool									_cleanUpScriptPipeEnd(int fd);
+
 	static const unsigned short				MAX_EPOLL_EVENTS = 64; // 64 - 512
 	static const unsigned short				EPOLL_WAIT_TIMEOUT_MS = 5000; // 100 - 5000
 	static const unsigned short				STALE_CLIENT_SWEEP_INTERVAL = 2;
