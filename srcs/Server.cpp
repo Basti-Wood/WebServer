@@ -501,7 +501,7 @@ void Server::_handlePipeReadEvent(int fd, std::map<int, Client*>::iterator it) {
 
 	if (client.getState() == Client::PENDING_RESPONSE) {
 
-		if (epoll_ctl(_epfd, EPOLL_CTL_DEL, fd, NULL) == -1) {
+		if (!_cleanUpScriptPipeEnd(fd)) {
 			log.warn("Error during cleanup: epoll_ctl: " + std::string(strerror(errno)));
 			dispatcher.buildErrorResponse(INTERNAL_SERVER_ERROR,
 										  client.getCurrentRequest().resolved.location,
@@ -517,24 +517,6 @@ void Server::_handlePipeReadEvent(int fd, std::map<int, Client*>::iterator it) {
 			client.markForTermination();
 			return;
 		}
-
-		if (close(fd) == -1) {
-			log.warn("Error during cleanup: close: " + std::string(strerror(errno)));
-			dispatcher.buildErrorResponse(INTERNAL_SERVER_ERROR,
-										  client.getCurrentRequest().resolved.location,
-										  client.getCurrentRequest().headers_only,
-										  client.getCurrentResponse());
-			client.setState(Client::PENDING_RESPONSE);
-			log.debug("client_" + i2a(it->first) + ": state set to PENDING_RESPONSE");
-			client.popRequest();
-			if (!_setWRONLYInterest(it->first)) {
-				_cleanUpClient(it);
-				return;
-			}
-			client.markForTermination();
-			return;
-		}
-
 	}
 
 	return;
@@ -601,42 +583,8 @@ void Server::_handlePipeWriteEvent(int fd, std::map<int, Client*>::iterator it) 
 
 	if (client.getState() == Client::PREPARING_RESPONSE) {
 
-		if (epoll_ctl(_epfd, EPOLL_CTL_DEL, fd, NULL) == -1) {
-			log.warn("Error during cleanup: epoll_ctl: " + std::string(strerror(errno)));
-			dispatcher.buildErrorResponse(INTERNAL_SERVER_ERROR,
-										  client.getCurrentRequest().resolved.location,
-										  client.getCurrentRequest().headers_only,
-										  client.getCurrentResponse());
-			client.setState(Client::PENDING_RESPONSE);
-			log.debug("client_" + i2a(it->first) + ": state set to PENDING_RESPONSE");
-			client.popRequest();
-			if (!_setWRONLYInterest(it->first)) {
-				_cleanUpClient(it);
-				return;
-			}
-			client.markForTermination();
-			return;
-		}
-
-		if (close(fd) == -1) {
-			log.warn("Error during cleanup: close: " + std::string(strerror(errno)));
-			dispatcher.buildErrorResponse(INTERNAL_SERVER_ERROR,
-										  client.getCurrentRequest().resolved.location,
-										  client.getCurrentRequest().headers_only,
-										  client.getCurrentResponse());
-			client.setState(Client::PENDING_RESPONSE);
-			log.debug("client_" + i2a(it->first) + ": state set to PENDING_RESPONSE");
-			client.popRequest();
-			if (!_setWRONLYInterest(it->first)) {
-				_cleanUpClient(it);
-				return;
-			}
-			client.markForTermination();
-			return;
-		}
-
 		int std_out = client.cgi_process->stdoutFd();
-		if (!_prepareScriptPipeEnd(std_out)) {
+		if ((!_cleanUpScriptPipeEnd(fd)) || (!_prepareScriptPipeEnd(std_out))) {
 			dispatcher.buildErrorResponse(INTERNAL_SERVER_ERROR,
 										  client.getCurrentRequest().resolved.location,
 										  client.getCurrentRequest().headers_only,
@@ -797,6 +745,21 @@ void Server::_cleanUpSocket(std::map<int, ListeningSocket>::iterator it) {
 	log.debug("Erasing container entry for above socket");
 	_sockets.erase(it);
 	return;
+}
+
+bool Server::_cleanUpScriptPipeEnd(int fd) {
+
+	if (epoll_ctl(_epfd, EPOLL_CTL_DEL, fd, NULL) == -1) {
+		log.warn("Error during cleanup: epoll_ctl: " + std::string(strerror(errno)));
+		return false;
+	}
+
+	if (close(fd) == -1) {
+		log.warn("Error during cleanup: close: " + std::string(strerror(errno)));
+		return false;
+	}
+
+	return true;
 }
 
   //~~~~~~~~~~~//
