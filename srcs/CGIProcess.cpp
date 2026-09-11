@@ -21,7 +21,7 @@ CGIProcess::CGIProcess(const std::string& path, const std::vector<std::string>& 
       _pipes_open(false),
       _pid(-1), _stdin_fd(-1), _stdout_fd(-1),
       _reaped(false), _exit_code(-1), _deadline(0),
-      _state(WRITING_PIPES),
+      // _state(WRITING_PIPES),
       _status(OK), _content_type("text/html"),
       _has_status(false), _has_location(false), _headers_done(false) {
 
@@ -207,24 +207,26 @@ ssize_t CGIProcess::queueIncomingData(int fd) {
     // I know it is always stdoutFd()...
     // but when we get passed the int why fetch it again via stdoutFd()
     // just using the int directly is faster
-	ssize_t got = _outstream.fetchData(fd, true);
+	// ssize_t got = _outstream.fetchData(fd, true);
+ //
+	// if (got == -1) {
+ //        // server closes fd
+	// 	// closeStdout();
+	// 	_state = ERROR;
+	// }
+ //
+	// // if (got > 0)
+	// // 	_consumeAvailableOutput();
+ //
+	// if (got == 0) {
+	// 	// _consumeAvailableOutput(); // fold in whatever's left before COMPLETE
+	// 	// closeStdout();
+	// 	_state = COMPLETE;
+	// }
+ //
+ //    return got;
+    return _outstream.fetchData(fd, true);
 
-	if (got == -1) {
-        // server closes fd
-		// closeStdout();
-		_state = ERROR;
-	}
-
-	// if (got > 0)
-	// 	_consumeAvailableOutput();
-
-	if (got == 0) {
-		// _consumeAvailableOutput(); // fold in whatever's left before COMPLETE
-		// closeStdout();
-		_state = COMPLETE;
-	}
-
-    return got;
 }
 
 static inline bool isLineWS(char c) {
@@ -274,7 +276,7 @@ bool CGIProcess::_consumeHeaderLine(std::size_t line_len) {
 	// ends up inside key, and ' ' isn't a tchar)
 	for (std::size_t i = 0; i < key.size(); ++i) {
 		if (!isTChar(key[i])) {
-			_state = ERROR;
+			// _state = ERROR;
 			return false;
 		}
 	}
@@ -303,16 +305,16 @@ bool CGIProcess::_consumeHeaderLine(std::size_t line_len) {
 
 // consumes whatever complete lines are in _outstream, same technique as
 // parseRequestLine()/parseHeaders(), just for cgi output
-void CGIProcess::_consumeAvailableOutput() {
+bool CGIProcess::consumeAvailableOutput() {
 
 	if (_headers_done) {
 		_body += _outstream.substr(0);
 		_outstream.reset();
-		return;
+		return true;
 	}
 
 	ssize_t nl;
-	while (!_headers_done && _state != ERROR && (nl = _outstream.find(http::LF)) != -1) {
+	while (!_headers_done/* && _state != ERROR */&& (nl = _outstream.find(http::LF)) != -1) {
 
 		std::size_t line_len = static_cast<std::size_t>(nl);
 		bool blank = _consumeHeaderLine(line_len);
@@ -323,13 +325,13 @@ void CGIProcess::_consumeAvailableOutput() {
 			_headers_done = true;
 			_body += _outstream.substr(0);
 			_outstream.reset();
-			return;
+			return true;
 		}
 
 	}
 
 	_outstream.compact(); // free up what we already committed past
-
+    return false;
 }
 
 // headers/body/status were already parsed incrementally as bytes arrived
@@ -338,14 +340,14 @@ void CGIProcess::buildResponse(HTTPResponse& response, bool headers_only) const 
 
     // a broken pipe read/write, or a malformed header line (bad field-name
     // char), lands here instead of COMPLETE
-    if (_state == ERROR) {
-        response.setStatus(INTERNAL_SERVER_ERROR);
-        response.setBody("", HEAP, "", headers_only);
-        return;
-    }
+    // if (_state == ERROR) {
+    //     response.setStatus(INTERNAL_SERVER_ERROR);
+    //     response.setBody("", HEAP, "", headers_only);
+    //     return;
+    // }
 
-    if (_state != COMPLETE)
-        return;
+    // if (_state != COMPLETE)
+    //     return;
 
     for (std::map<std::string, std::string>::const_iterator it = _headers.begin();
          it != _headers.end(); ++it) {

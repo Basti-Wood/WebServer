@@ -24,13 +24,13 @@ struct CGIResult {
 // blocking wait anywhere in this class.
 class CGIProcess {
 public:
-    enum ScriptState {
-        WRITING_PIPES,
-        // PROCESSING,
-        // READING_PIPES,
-        COMPLETE,
-        ERROR
-    };
+    // enum ScriptState {
+    //     WRITING_PIPES,
+    //     PROCESSING,
+    //     READING_PIPES,
+    //     COMPLETE,
+    //     ERROR
+    // };
 
     CGIProcess(const std::string& path,
                const std::vector<std::string>& args,
@@ -52,8 +52,10 @@ public:
 
     ssize_t queueIncomingData(int fd);
 
-    void writeStdin(); // one non-blocking write attempt, WRITING_PIPES only
-    void readStdout();  // one non-blocking read attempt, moves PROCESSING -> READING_PIPES
+    bool consumeAvailableOutput();
+
+    // void writeStdin(); // one non-blocking write attempt, WRITING_PIPES only
+    // void readStdout();  // one non-blocking read attempt, moves PROCESSING -> READING_PIPES
 
     bool wantsWrite() const;
     bool wantsRead()  const;
@@ -81,7 +83,7 @@ private:
     bool _consumeHeaderLine(std::size_t line_len);
     // finds complete lines in _outstream, commits begin past each one;
     // once the blank line is hit, the rest becomes _body
-    void _consumeAvailableOutput();
+    // void _consumeAvailableOutput();
 
     // stored for spawn() (next step), which forks+execve's using these
     std::string                        _path;
@@ -106,7 +108,7 @@ private:
 
     Buffer      _instream;  // -> our stdin
     Buffer      _outstream; // <- our stdout
-    ScriptState _state;
+    // ScriptState _state;
 
     // response, parsed incrementally as bytes arrive
     std::map<std::string, std::string> _headers;

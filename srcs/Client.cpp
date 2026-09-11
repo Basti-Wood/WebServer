@@ -580,6 +580,11 @@ void Client::markForTermination(void) {
 	return;
 }
 
+void Client::uptdateTimeStamp(void) {
+	_last_event = std::time(NULL);
+	return;
+}
+
 void Client::reset(void) {
 
 	delete cgi_process;

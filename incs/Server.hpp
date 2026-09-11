@@ -59,21 +59,20 @@ private:
 	bool									_prepareScriptPipeEnd(int fd);
 
 	void									_acceptConnectRequest(int fd, ListeningSocket socket);
-	void									_handleSocketError(int fd, std::map<int, Client*>::iterator it);
+	void									_handleSocketError(std::map<int, Client*>::iterator it);
 
-	bool									_handleSocketReadEvent(int fd, std::map<int, Client*>::iterator it);
+	bool									_handleSocketReadEvent(std::map<int, Client*>::iterator it);
 
-	void									_handlePipeReadEvent(int fd, std::map<int, Client*>::iterator it);
-	void									_handleSocketWriteEvent(int fd, std::map<int, Client*>::iterator it);
-	void									_handlePipeWriteEvent(int fd, std::map<int, Client*>::iterator it);
+	void									_handlePipeReadEvent(std::map<int, Client*>::iterator it);
+	void									_handleSocketWriteEvent(std::map<int, Client*>::iterator it);
+	void									_handlePipeWriteEvent(std::map<int, Client*>::iterator it);
 
 	void									_staleClientReaper(const std::time_t now);
 
 	void									_cleanUpAllRessources(void);
+	void									_cleanUpScriptPipeEnd(std::map<int, Client*>::iterator it);
 	void									_cleanUpClient(std::map<int, Client*>::iterator it);
 	void									_cleanUpSocket(std::map<int, ListeningSocket>::iterator it);
-
-	bool									_cleanUpScriptPipeEnd(int fd);
 
 	static const unsigned short				MAX_EPOLL_EVENTS = 64; // 64 - 512
 	static const unsigned short				EPOLL_WAIT_TIMEOUT_MS = 5000; // 100 - 5000
