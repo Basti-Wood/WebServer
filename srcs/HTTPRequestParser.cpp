@@ -705,8 +705,8 @@ bool RequestParser::_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HT
 											  &buffer.data[buffer.begin], n);
 				if (bytes_consumed < 0) {
 					log.error("write: " + std::string(strerror(errno)));
-					request.parsing.error_cause = INTERNAL_SERVER_ERROR;
-					request.parsing.state = HTTPRequest::ERROR;
+					p.error_cause = INTERNAL_SERVER_ERROR;
+					p.state = HTTPRequest::ERROR;
 					return false;
 				}
 
@@ -732,8 +732,8 @@ bool RequestParser::_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HT
 											  &buffer.data[buffer.begin], boundary_pos);
 				if (bytes_consumed < 0) {
 					log.error("write: " + std::string(strerror(errno)));
-					request.parsing.error_cause = INTERNAL_SERVER_ERROR;
-					request.parsing.state = HTTPRequest::ERROR;
+					p.error_cause = INTERNAL_SERVER_ERROR;
+					p.state = HTTPRequest::ERROR;
 					return false;
 				}
 
@@ -854,8 +854,8 @@ bool RequestParser::_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HT
 		*/
 		if (cgi_process == NULL) {
 			log.error("null pointer provided");
-			request.parsing.error_cause = INTERNAL_SERVER_ERROR;
-			request.parsing.state = HTTPRequest::ERROR;
+			p.error_cause = INTERNAL_SERVER_ERROR;
+			p.state = HTTPRequest::ERROR;
 			return false;
 		}
 
@@ -873,8 +873,8 @@ bool RequestParser::_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HT
 		ssize_t bytes_consumed = write(cgi_process->stdinFd(), &buffer.data[buffer.begin], n);
 		if (bytes_consumed < 0) {
 			log.error("write: " + std::string(strerror(errno)));
-			request.parsing.error_cause = INTERNAL_SERVER_ERROR;
-			request.parsing.state = HTTPRequest::ERROR;
+			p.error_cause = INTERNAL_SERVER_ERROR;
+			p.state = HTTPRequest::ERROR;
 			return false;
 		}
 
@@ -891,8 +891,8 @@ bool RequestParser::_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HT
 			try {
 				createFile(request);
 			} catch (std::exception& e) {
-				request.parsing.error_cause = INTERNAL_SERVER_ERROR;
-				request.parsing.state = HTTPRequest::ERROR;
+				p.error_cause = INTERNAL_SERVER_ERROR;
+				p.state = HTTPRequest::ERROR;
 				log.warn(e.what());
 				return false;
 			}
@@ -919,14 +919,14 @@ bool RequestParser::_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HT
 				try {
 					createFile(request);
 				} catch (std::exception& e) {
-					request.parsing.error_cause = INTERNAL_SERVER_ERROR;
-					request.parsing.state = HTTPRequest::ERROR;
+					p.error_cause = INTERNAL_SERVER_ERROR;
+					p.state = HTTPRequest::ERROR;
 					log.warn(e.what());
 					return false;
 				}
 				if (!spoolBody(request.body.temp, request.body.file)) {
-					request.parsing.error_cause = INTERNAL_SERVER_ERROR;
-					request.parsing.state = HTTPRequest::ERROR;
+					p.error_cause = INTERNAL_SERVER_ERROR;
+					p.state = HTTPRequest::ERROR;
 					std::remove(request.body.path.c_str());
 					return false;
 				}
@@ -939,15 +939,15 @@ bool RequestParser::_parseBody(const Buffer& buffer, CGIProcess* cgi_process, HT
 			bytes_consumed = write(request.body.file, &buffer.data[buffer.begin], n);
 			if (bytes_consumed < 0) {
 				log.error("write: " + std::string(strerror(errno)));
-				request.parsing.error_cause = INTERNAL_SERVER_ERROR;
-				request.parsing.state = HTTPRequest::ERROR;
+				p.error_cause = INTERNAL_SERVER_ERROR;
+				p.state = HTTPRequest::ERROR;
 				return false;
 			}
 			break;
 
 		case NONE:
-			request.parsing.error_cause = INTERNAL_SERVER_ERROR;
-			request.parsing.state = HTTPRequest::ERROR;
+			p.error_cause = INTERNAL_SERVER_ERROR;
+			p.state = HTTPRequest::ERROR;
 			return false;
 		}
 

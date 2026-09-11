@@ -56,6 +56,7 @@ private:
 	bool									_setPollInterest(int fd, bool is_pipe = false);
 	bool									_setRDONLYInterest(int fd, bool is_pipe = false);
 	bool									_setWRONLYInterest(int fd, bool is_pipe = false);
+	bool									_prepareScriptPipeEnd(int fd);
 
 	void									_acceptConnectRequest(int fd, ListeningSocket socket);
 	void									_handleSocketError(int fd, std::map<int, Client*>::iterator it);
@@ -83,9 +84,9 @@ private:
 	// std::map<int, const Config::Socket*>	_sockets;
 	std::map<int, ListeningSocket>			_sockets;
 	std::map<int, Client*>					_clients;
+	// std::map<HTTPRequest*, Client*>			_dunno;
+	// std::map<CGIProcess*, HTTPRequest*>		_could_be_handled_via_request_id;
 	// std::map<int, CGIProcess*>				_scripts;
-	// std::map<CGIProcess*, HTTPRequest*>		_dunno;
-	// std::map<HTTPRequest*, Client*>			_Idunno;
 	std::map<int, Client*>					_scripts;
 
 	epoll_event								_events[MAX_EPOLL_EVENTS];

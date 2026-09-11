@@ -49,9 +49,9 @@ Client::Client(const sockaddr_in socket, const Config::Socket* config)
 	_response.body.size = 0;
 	_response.body.sink = NONE;
 
-	// Create new request object in deque container
+	// Create new request object
 	pushRequest();
-	// Create new response object in deque container
+	// Create new response object
 	pushResponse();
 
 	return;
@@ -289,23 +289,21 @@ void Client::parseDataFromPeer(void) {
 
 		if (request.parsing.state == HTTPRequest::COMPLETE) {
 
-			if (request.body_chunked) {
-				if (!request.requires_CGI) promoteFile(request);
-				break;
-			}
+			if (!request.body_chunked) {
 
-			if (request.parsing.body_size < request.body.size) {
-				log.error("parse error: received body shorter than advertised size");
-				request.parsing.state = HTTPRequest::ERROR;
-				request.parsing.error_cause = BAD_REQUEST;
-				break;
-			}
+				if (request.parsing.body_size < request.body.size) {
+					log.error("parse error: received body shorter than advertised size");
+					request.parsing.state = HTTPRequest::ERROR;
+					request.parsing.error_cause = BAD_REQUEST;
+					break;
+				}
 
-			if (request.parsing.body_size > request.body.size) {
-				log.error("parse error: received body exceeded advertised size");
-				request.parsing.state = HTTPRequest::ERROR;
-				request.parsing.error_cause = BAD_REQUEST;
-				break;
+				if (request.parsing.body_size > request.body.size) {
+					log.error("parse error: received body exceeded advertised size");
+					request.parsing.state = HTTPRequest::ERROR;
+					request.parsing.error_cause = BAD_REQUEST;
+					break;
+				}
 			}
 
 			if (!request.requires_CGI) promoteFile(request);
@@ -335,7 +333,11 @@ void Client::parseDataFromPeer(void) {
 			break;
 		case HTTPRequest::COMPLETE:
 			log.info("Full HTTP request body received");
-			// same for CGI, Dispatcher handles it from here
+			// We could set client state to AWAITING_CGI_OUTPUT
+			// here, instead of having the dispatcher do it
+			// if (request.requires_CGI == true) {
+			// 	setState(Client::AWAITING_CGI_OUTPUT);
+			// } else {}
 			setState(Client::PREPARING_RESPONSE);
 			if (_instream.data.size() != BUFFER_SIZE) {
 				_instream.data.resize(BUFFER_SIZE);
@@ -531,7 +533,7 @@ void Client::sendDataToTCPPeer(int fd) {
 	return;
 }
 
-// Create new request object in deque container
+// Create new request object
 void Client::pushRequest(void) {
 
 	HTTPRequest* request = new HTTPRequest((sockaddr_in*)&_remote_addr, &_server_addr);
@@ -540,7 +542,7 @@ void Client::pushRequest(void) {
 	return;
 }
 
-// Create new response object in deque container
+// Create new response object
 void Client::pushResponse(void) {
 
 	HTTPResponse* response = new HTTPResponse;
@@ -549,16 +551,7 @@ void Client::pushResponse(void) {
 	return;
 }
 
-// Delete processed request from deque container
-// void Client::popProcess(void) {
-//
-// 	delete process_queue.front();
-// 	process_queue.pop_front();
-//
-// 	return;
-// }
-
-// Delete processed request from deque container
+// Delete processed request object
 void Client::popRequest(void) {
 
 	delete _request_queue.front();
@@ -567,7 +560,7 @@ void Client::popRequest(void) {
 	return;
 }
 
-// Delete processed response object in deque container
+// Delete processed response object
 void Client::popResponse(void) {
 
 	delete _response_queue.front();
