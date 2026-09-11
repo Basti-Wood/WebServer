@@ -305,12 +305,12 @@ bool CGIProcess::_consumeHeaderLine(std::size_t line_len) {
 
 // consumes whatever complete lines are in _outstream, same technique as
 // parseRequestLine()/parseHeaders(), just for cgi output
-bool CGIProcess::consumeAvailableOutput() {
+void CGIProcess::consumeAvailableOutput() {
 
 	if (_headers_done) {
 		_body += _outstream.substr(0);
 		_outstream.reset();
-		return true;
+		return;
 	}
 
 	ssize_t nl;
@@ -325,13 +325,13 @@ bool CGIProcess::consumeAvailableOutput() {
 			_headers_done = true;
 			_body += _outstream.substr(0);
 			_outstream.reset();
-			return true;
+			return;
 		}
 
 	}
 
 	_outstream.compact(); // free up what we already committed past
-    return false;
+    return;
 }
 
 // headers/body/status were already parsed incrementally as bytes arrived

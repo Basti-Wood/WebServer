@@ -52,7 +52,7 @@ public:
 
     ssize_t queueIncomingData(int fd);
 
-    bool consumeAvailableOutput();
+    void consumeAvailableOutput();
 
     // void writeStdin(); // one non-blocking write attempt, WRITING_PIPES only
     // void readStdout();  // one non-blocking read attempt, moves PROCESSING -> READING_PIPES

@@ -522,19 +522,14 @@ void Server::_handlePipeReadEvent(std::map<int, Client*>::iterator it) {
 
 		log.info("Script delivered full response via fd_" + i2a(fd));
 		_cleanUpScriptPipeEnd(it);
-		if (client.cgi_process->consumeAvailableOutput() == true) {
-			client.setState(Client::PREPARING_RESPONSE);
-		}
+		client.setState(Client::PREPARING_RESPONSE);
 
 	} else {
 
 		client.uptdateTimeStamp();
 		// TEST have CGIProcess consume the data in the buffer
-		if (client.cgi_process->consumeAvailableOutput() == true) {
-			log.info("Script delivered full response via fd_" + i2a(fd));
-			_cleanUpScriptPipeEnd(it);
-			client.setState(Client::PREPARING_RESPONSE);
-		}
+		client.cgi_process->consumeAvailableOutput();
+
 	}
 
 	if (client.getState() ==  Client::PREPARING_RESPONSE) {
