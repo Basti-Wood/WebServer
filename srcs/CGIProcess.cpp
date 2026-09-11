@@ -8,7 +8,6 @@
 #include <poll.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <errno.h>
 #include <string.h>
 #include <stdlib.h>
 #include <vector>
@@ -152,74 +151,80 @@ void CGIProcess::closeStdout() {
 
 // fd always equals stdoutFd(); readStdout() does the actual fetch, parses
 // whatever's complete, and detects COMPLETE/ERROR
-ssize_t CGIProcess::queueIncomingData(int fd) {
-	(void)fd;
-	readStdout();
-	return 0;
-}
+// ssize_t CGIProcess::queueIncomingData(int fd) {
+// 	(void)fd;
+// 	readStdout();
+// 	return 0;
+// }
 
 
 // same shape as handleWritable(), just using _instream
 // of the raw _input string
-void CGIProcess::writeStdin() {
-
-	if (_state != WRITING_PIPES)
-		return;
-
-	if (_instream.begin == _instream.end) {
-		closeStdin();
-		_state = PROCESSING;
-		return;
-	}
-
-	ssize_t written = _instream.flushData(stdinFd(), true);
-
-	// poll() already told us this fd is ready; treat any -1 as fatal,
-	// same as Server::_handleSocketReadEvent() does for sockets. Not
-	// allowed to branch on errno's value to decide what to do next.
-	if (written == -1) {
-		_state = ERROR;
-		return;
-	}
-
-	if (_instream.begin == _instream.end) {
-		closeStdin();
-		_state = PROCESSING;
-	}
-
-}
+// void CGIProcess::writeStdin() {
+//
+// 	if (_state != WRITING_PIPES)
+// 		return;
+//
+// 	if (_instream.begin == _instream.end) {
+// 		closeStdin();
+// 		_state = PROCESSING;
+// 		return;
+// 	}
+//
+// 	ssize_t written = _instream.flushData(stdinFd(), true);
+//
+// 	// poll() already told us this fd is ready; treat any -1 as fatal,
+// 	// same as Server::_handleSocketReadEvent() does for sockets. Not
+// 	// allowed to branch on errno's value to decide what to do next.
+// 	if (written == -1) {
+// 		_state = ERROR;
+// 		return;
+// 	}
+//
+// 	if (_instream.begin == _instream.end) {
+// 		closeStdin();
+// 		_state = PROCESSING;
+// 	}
+//
+// }
 
 // same shape as writeStdin(), just reading into _outstream instead
-void CGIProcess::readStdout() {
+ssize_t CGIProcess::queueIncomingData(int fd) {
 
 	// nothing else moves us from PROCESSING to READING_PIPES, do it here
-	if (_state == PROCESSING)
-		_state = READING_PIPES;
+	// if (_state == PROCESSING)
+	// 	_state = READING_PIPES;
 
-	if (_state != READING_PIPES)
-		return;
+	// if (_state != READING_PIPES)
+	// 	return;
 
+	// Problematic, because caller can not differentiate this from got == 0
+	// will think about this during the day...
 	// buffer full, not necessarily eof, wait for something to drain it
-	if (_outstream.end == _outstream.data.size())
-		return;
+	// if (_outstream.end == _outstream.data.size())
+	// 	return 0;
 
-	ssize_t got = _outstream.fetchData(stdoutFd(), true);
+    // I know it is always stdoutFd()...
+    // but when we get passed the int why fetch it again via stdoutFd()
+    // just using the int directly is faster
+	ssize_t got = _outstream.fetchData(fd, true);
 
 	if (got == -1) {
-		closeStdout();
+        // server closes fd
+		// closeStdout();
 		_state = ERROR;
-		return;
 	}
 
-	if (got > 0)
-		_consumeAvailableOutput();
+	// if (got > 0)
+	// 	_consumeAvailableOutput();
 
 	if (got == 0) {
-		_consumeAvailableOutput(); // fold in whatever's left before COMPLETE
-		closeStdout();
+		// _consumeAvailableOutput(); // fold in whatever's left before COMPLETE
+		// closeStdout();
 		_state = COMPLETE;
 	}
 
+    return got;
 }
 
 static inline bool isLineWS(char c) {

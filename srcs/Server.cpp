@@ -491,11 +491,27 @@ void Server::_handlePipeReadEvent(int fd, std::map<int, Client*>::iterator it) {
 
 	Client& client = *it->second;
 	if (client.getState() == Client::AWAITING_CGI_OUTPUT) {
-		client.cgi_process->queueIncomingData(fd);
-		if (!client.cgi_process->wantsRead()) {
+	 	if (!client.cgi_process->wantsRead()) {
 			client.cgi_process->buildResponse(client.getCurrentResponse(),
 											  client.getCurrentRequest().headers_only);
 			client.setState(Client::PENDING_RESPONSE);
+		}
+		ssize_t bytes_read = client.cgi_process->queueIncomingData(fd);
+		if (bytes_read < 0) {
+			_cleanUpScriptPipeEnd(fd);
+			dispatcher.buildErrorResponse(INTERNAL_SERVER_ERROR,
+										  client.getCurrentRequest().resolved.location,
+										  client.getCurrentRequest().headers_only,
+										  client.getCurrentResponse());
+			client.setState(Client::PENDING_RESPONSE);
+			log.debug("client_" + i2a(it->first) + ": state set to PENDING_RESPONSE");
+			client.popRequest();
+			if (!_setWRONLYInterest(it->first)) {
+				_cleanUpClient(it);
+				return;
+			}
+			client.markForTermination();
+			return;
 		}
 	}
 

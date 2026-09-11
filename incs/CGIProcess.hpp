@@ -26,8 +26,8 @@ class CGIProcess {
 public:
     enum ScriptState {
         WRITING_PIPES,
-        PROCESSING,
-        READING_PIPES,
+        // PROCESSING,
+        // READING_PIPES,
         COMPLETE,
         ERROR
     };
