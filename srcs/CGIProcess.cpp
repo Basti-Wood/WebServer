@@ -150,9 +150,12 @@ void CGIProcess::closeStdout() {
 }
 
 
+// fd always equals stdoutFd(); readStdout() does the actual fetch, parses
+// whatever's complete, and detects COMPLETE/ERROR
 ssize_t CGIProcess::queueIncomingData(int fd) {
-    ssize_t bytes_read = _outstream.fetchData(fd, true);
-	return bytes_read;
+	(void)fd;
+	readStdout();
+	return 0;
 }
 
 
@@ -203,6 +206,7 @@ void CGIProcess::readStdout() {
 	ssize_t got = _outstream.fetchData(stdoutFd(), true);
 
 	if (got == -1) {
+		closeStdout();
 		_state = ERROR;
 		return;
 	}
@@ -468,57 +472,57 @@ void CGIProcess::forceKill() {
 //     return res;
 // }
 
-CGIResult run_cgi(const std::string& path, const std::vector<std::string>& args,
-                   const std::map<std::string, std::string>& env,
-                   const std::string& working_dir) {
-
-    CGIProcess proc(path, args, env, working_dir);
-    if (!proc.valid())
-        return CGIResult();
-
-    while (!proc.isDone()) {
-        if (!proc.wantsWrite() && !proc.wantsRead()) {
-            proc.tryReap(true);
-            break;
-        }
-
-        struct pollfd fds[2];
-        nfds_t count = 0;
-        int write_idx = -1;
-        int read_idx = -1;
-
-        if (proc.wantsWrite()) {
-            write_idx = (int)count;
-            fds[count].fd = proc.stdinFd();
-            fds[count].events = POLLOUT;
-            fds[count].revents = 0;
-            ++count;
-        }
-        if (proc.wantsRead()) {
-            read_idx = (int)count;
-            fds[count].fd = proc.stdoutFd();
-            fds[count].events = POLLIN;
-            fds[count].revents = 0;
-            ++count;
-        }
-
-        int ready = poll(fds, count, 100);
-        if (ready == -1) {
-            if (errno == EINTR) continue;
-            break;
-        }
-        if (ready == 0) {
-            if (proc.isExpired(std::time(NULL)))
-                proc.forceKill();
-            continue;
-        }
-
-        if (write_idx != -1 && (fds[write_idx].revents & (POLLOUT | POLLERR | POLLHUP)))
-            proc.handleWritable();
-        if (read_idx != -1 && (fds[read_idx].revents & (POLLIN | POLLERR | POLLHUP)))
-            proc.handleReadable();
-    }
-
-    proc.tryReap(true);
-    return proc.result();
-}
+// CGIResult run_cgi(const std::string& path, const std::vector<std::string>& args,
+//                    const std::map<std::string, std::string>& env,
+//                    const std::string& working_dir) {
+//
+//     CGIProcess proc(path, args, env, working_dir);
+//     if (!proc.valid())
+//         return CGIResult();
+//
+//     while (!proc.isDone()) {
+//         if (!proc.wantsWrite() && !proc.wantsRead()) {
+//             proc.tryReap(true);
+//             break;
+//         }
+//
+//         struct pollfd fds[2];
+//         nfds_t count = 0;
+//         int write_idx = -1;
+//         int read_idx = -1;
+//
+//         if (proc.wantsWrite()) {
+//             write_idx = (int)count;
+//             fds[count].fd = proc.stdinFd();
+//             fds[count].events = POLLOUT;
+//             fds[count].revents = 0;
+//             ++count;
+//         }
+//         if (proc.wantsRead()) {
+//             read_idx = (int)count;
+//             fds[count].fd = proc.stdoutFd();
+//             fds[count].events = POLLIN;
+//             fds[count].revents = 0;
+//             ++count;
+//         }
+//
+//         int ready = poll(fds, count, 100);
+//         if (ready == -1) {
+//             if (errno == EINTR) continue;
+//             break;
+//         }
+//         if (ready == 0) {
+//             if (proc.isExpired(std::time(NULL)))
+//                 proc.forceKill();
+//             continue;
+//         }
+//
+//         if (write_idx != -1 && (fds[write_idx].revents & (POLLOUT | POLLERR | POLLHUP)))
+//             proc.handleWritable();
+//         if (read_idx != -1 && (fds[read_idx].revents & (POLLIN | POLLERR | POLLHUP)))
+//             proc.handleReadable();
+//     }
+//
+//     proc.tryReap(true);
+//     return proc.result();
+// }

@@ -118,10 +118,9 @@ private:
     std::string _body;
 };
 
-// Blocking convenience wrapper around CGIProcess for standalone/offline use
-// (tests). The live server drives a CGIProcess from its own epoll loop
-// instead of calling this.
-CGIResult run_cgi(const std::string& path,
-                  const std::vector<std::string>& args,
-                  const std::map<std::string, std::string>& env,
-                  const std::string& working_dir = "");
+// deprecated: called handleWritable()/handleReadable()/result(), which are
+// now commented out in CGIProcess.cpp (used the removed _input/_output)
+// CGIResult run_cgi(const std::string& path,
+//                   const std::vector<std::string>& args,
+//                   const std::map<std::string, std::string>& env,
+//                   const std::string& working_dir = "");

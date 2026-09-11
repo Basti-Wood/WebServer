@@ -568,17 +568,19 @@ bool RequestParser::_parseChunks(Buffer& buffer, CGIProcess* cgi_process, HTTPRe
 
 		if (p.line_ending == HTTPRequest::CRLF) {
 			if (buffer.data[buffer.mark] != '\r' ||
-				buffer.data[buffer.mark + 1] != '\n')
+				buffer.data[buffer.mark + 1] != '\n') {
 				log.error("invalid chunk CRLF");
 				request.parsing.error_cause = BAD_REQUEST;
 				request.parsing.state = HTTPRequest::ERROR;
 				return false;
+			}
 		} else if (p.line_ending ==  HTTPRequest::LF) {
-			if (buffer.data[buffer.mark] != '\n')
+			if (buffer.data[buffer.mark] != '\n') {
 				log.error("invalid chunk LF");
 				request.parsing.error_cause = BAD_REQUEST;
 				request.parsing.state = HTTPRequest::ERROR;
 				return false;
+			}
 		} else {
 			log.error("invalid chunk");
 			request.parsing.error_cause = INTERNAL_SERVER_ERROR;

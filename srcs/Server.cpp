@@ -492,8 +492,12 @@ void Server::_handlePipeReadEvent(int fd, std::map<int, Client*>::iterator it) {
 	Client& client = *it->second;
 	if (client.getState() == Client::AWAITING_CGI_OUTPUT) {
 		client.cgi_process->queueIncomingData(fd);
+		if (!client.cgi_process->wantsRead()) {
+			client.cgi_process->buildResponse(client.getCurrentResponse(),
+											  client.getCurrentRequest().headers_only);
+			client.setState(Client::PENDING_RESPONSE);
+		}
 	}
-	// TODO have the CGI process parse the CGI response and populate the response object
 
 	if (client.getState() == Client::PENDING_RESPONSE) {
 
