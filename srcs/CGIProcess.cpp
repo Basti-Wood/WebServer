@@ -263,25 +263,31 @@ bool CGIProcess::_consumeHeaderLine(std::size_t line_len) {
 	if (first == last)
 		return true; // blank line, headers are done
 
-	std::string line = _outstream.substr(first, last);
-
-	std::size_t colon = line.find(':');
-	if (colon == std::string::npos)
+	std::size_t colon = first;
+	while (colon < last && _outstream.data[_outstream.begin + colon] != ':')
+		++colon;
+	if (colon == last)
 		return false;
-
-	std::string key = line.substr(0, colon);
 
 	// field-name is a token: no whitespace or separators allowed, so this
 	// also catches "Content-Type : text/plain" (space before the colon
 	// ends up inside key, and ' ' isn't a tchar)
-	for (std::size_t i = 0; i < key.size(); ++i) {
-		if (!isTChar(key[i])) {
+	for (std::size_t i = first; i < colon; ++i) {
+		if (!isTChar(_outstream.data[_outstream.begin + i])) {
 			// _state = ERROR;
 			return false;
 		}
 	}
 
-	std::string value = trim(line.substr(colon + 1));
+	std::size_t value_first = colon + 1;
+	while (value_first < last && isLineWS(_outstream.data[_outstream.begin + value_first]))
+		++value_first;
+	std::size_t value_last = last;
+	while (value_last > value_first && isLineWS(_outstream.data[_outstream.begin + value_last - 1]))
+		--value_last;
+
+	std::string key = _outstream.substr(first, colon);
+	std::string value = _outstream.substr(value_first, value_last);
 	std::string key_lower = tolowerASCII(key);
 
 	if (key_lower == "status") {
@@ -320,6 +326,7 @@ void CGIProcess::consumeAvailableOutput() {
 		bool blank = _consumeHeaderLine(line_len);
 
 		_outstream.begin += line_len + 1;
+		_outstream.mark = _outstream.begin;
 
 		if (blank) {
 			_headers_done = true;
