@@ -252,18 +252,17 @@ static bool isIgnored(const std::string& name) {
 // inside trim()
 bool CGIProcess::_consumeHeaderLine(std::size_t line_len) {
 
-	std::size_t first = 0;
-	while (first < line_len && isLineWS(_outstream.data[_outstream.begin + first]))
-		++first;
-
 	std::size_t last = line_len;
-	while (last > first && isLineWS(_outstream.data[_outstream.begin + last - 1]))
+	if (last > 0 && _outstream.data[_outstream.begin + last - 1] == '\r')
 		--last;
 
-	if (first == last)
+	if (last == 0)
 		return true; // blank line, headers are done
 
-	std::size_t colon = first;
+	if (isLineWS(_outstream.data[_outstream.begin]))
+		return false;
+
+	std::size_t colon = 0;
 	while (colon < last && _outstream.data[_outstream.begin + colon] != ':')
 		++colon;
 	if (colon == last)
@@ -272,7 +271,7 @@ bool CGIProcess::_consumeHeaderLine(std::size_t line_len) {
 	// field-name is a token: no whitespace or separators allowed, so this
 	// also catches "Content-Type : text/plain" (space before the colon
 	// ends up inside key, and ' ' isn't a tchar)
-	for (std::size_t i = first; i < colon; ++i) {
+	for (std::size_t i = 0; i < colon; ++i) {
 		if (!isTChar(_outstream.data[_outstream.begin + i])) {
 			// _state = ERROR;
 			return false;
@@ -286,11 +285,10 @@ bool CGIProcess::_consumeHeaderLine(std::size_t line_len) {
 	while (value_last > value_first && isLineWS(_outstream.data[_outstream.begin + value_last - 1]))
 		--value_last;
 
-	std::string key = _outstream.substr(first, colon);
+	std::string key = _outstream.substr(0, colon);
 	std::string value = _outstream.substr(value_first, value_last);
-	std::string key_lower = tolowerASCII(key);
 
-	if (key_lower == "status") {
+	if (equalCI(key, "Status")) {
 		int code = std::atoi(value.c_str());
 		if (code >= 100 && code <= 599) {
 			_status = static_cast<StatusCode>(code);
@@ -298,9 +296,9 @@ bool CGIProcess::_consumeHeaderLine(std::size_t line_len) {
 		}
 		return false;
 	}
-	if (key_lower == "content-type")
+	if (equalCI(key, "Content-Type"))
 		_content_type = value;
-	if (key_lower == "location")
+	if (equalCI(key, "Location"))
 		_has_location = true;
 
 	if (!isIgnored(key))
