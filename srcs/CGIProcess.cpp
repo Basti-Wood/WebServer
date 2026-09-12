@@ -17,116 +17,116 @@ static const int CGI_TIMEOUT_S = 10;
 CGIProcess::CGIProcess(const std::string& path, const std::vector<std::string>& args,
                        const std::map<std::string, std::string>& env,
                        const std::string& working_dir)
-    : _path(path), _args(args), _env(env), _working_dir(working_dir),
-      _pipes_open(false),
-      _pid(-1), _stdin_fd(-1), _stdout_fd(-1),
-      _reaped(false), _exit_code(-1), _deadline(0),
-      // _state(WRITING_PIPES),
-      _status(OK), _content_type("text/html"),
-      _has_status(false), _has_location(false), _headers_done(false) {
+	: _path(path), _args(args), _env(env), _working_dir(working_dir),
+	_pipes_open(false),
+	_pid(-1), _stdin_fd(-1), _stdout_fd(-1),
+	_reaped(false), _exit_code(-1), _deadline(0),
+	// _state(WRITING_PIPES),
+	_status(OK), _content_type("text/html"),
+	_has_status(false), _has_location(false), _headers_done(false) {
 
-    _in_pipe[0] = -1; _in_pipe[1] = -1;
-    _out_pipe[0] = -1; _out_pipe[1] = -1;
+	_in_pipe[0] = -1; _in_pipe[1] = -1;
+	_out_pipe[0] = -1; _out_pipe[1] = -1;
 
-    if (pipe(_in_pipe) == -1)
-        return;
-    if (pipe(_out_pipe) == -1) {
-        close(_in_pipe[0]); close(_in_pipe[1]);
-        _in_pipe[0] = -1; _in_pipe[1] = -1;
-        return;
-    }
+	if (pipe(_in_pipe) == -1)
+		return;
+	if (pipe(_out_pipe) == -1) {
+		close(_in_pipe[0]); close(_in_pipe[1]);
+		_in_pipe[0] = -1; _in_pipe[1] = -1;
+		return;
+	}
 
-    _pipes_open = true;
+	_pipes_open = true;
 }
 
 bool CGIProcess::spawn() {
 
-    if (!_pipes_open || _pid != -1)
-        return false;
+	if (!_pipes_open || _pid != -1)
+		return false;
 
-    pid_t pid = fork();
-    if (pid == -1) {
-        close(_in_pipe[0]); close(_in_pipe[1]);
-        close(_out_pipe[0]); close(_out_pipe[1]);
-        _in_pipe[0] = -1; _in_pipe[1] = -1;
-        _out_pipe[0] = -1; _out_pipe[1] = -1;
-        _pipes_open = false;
-        return false;
-    }
+	pid_t pid = fork();
+	if (pid == -1) {
+		close(_in_pipe[0]); close(_in_pipe[1]);
+		close(_out_pipe[0]); close(_out_pipe[1]);
+		_in_pipe[0] = -1; _in_pipe[1] = -1;
+		_out_pipe[0] = -1; _out_pipe[1] = -1;
+		_pipes_open = false;
+		return false;
+	}
 
-    if (pid == 0) {
-        close(_in_pipe[1]);
-        close(_out_pipe[0]);
-        if (dup2(_in_pipe[0], STDIN_FILENO) == -1) _exit(127);
-        if (dup2(_out_pipe[1], STDOUT_FILENO) == -1) _exit(127);
-        close(_in_pipe[0]); close(_out_pipe[1]);
-        if (!_working_dir.empty()) {
-            if (chdir(_working_dir.c_str()) != 0) _exit(126);
-        }
+	if (pid == 0) {
+		close(_in_pipe[1]);
+		close(_out_pipe[0]);
+		if (dup2(_in_pipe[0], STDIN_FILENO) == -1) _exit(127);
+		if (dup2(_out_pipe[1], STDOUT_FILENO) == -1) _exit(127);
+		close(_in_pipe[0]); close(_out_pipe[1]);
+		if (!_working_dir.empty()) {
+			if (chdir(_working_dir.c_str()) != 0) _exit(126);
+		}
 
-        std::vector<char*> argv;
-        if (_args.empty()) {
-            argv.push_back(const_cast<char*>(_path.c_str()));
-        } else {
-            for (size_t i = 0; i < _args.size(); ++i)
-                argv.push_back(const_cast<char*>(_args[i].c_str()));
-        }
-        argv.push_back(NULL);
+		std::vector<char*> argv;
+		if (_args.empty()) {
+			argv.push_back(const_cast<char*>(_path.c_str()));
+		} else {
+			for (size_t i = 0; i < _args.size(); ++i)
+				argv.push_back(const_cast<char*>(_args[i].c_str()));
+		}
+		argv.push_back(NULL);
 
-        std::vector<std::string> env_strings;
-        env_strings.reserve(_env.size());
-        for (std::map<std::string, std::string>::const_iterator it = _env.begin(); it != _env.end(); ++it)
-            env_strings.push_back(it->first + "=" + it->second);
-        std::vector<char*> envp;
-        envp.reserve(env_strings.size() + 1);
-        for (size_t i = 0; i < env_strings.size(); ++i)
-            envp.push_back(const_cast<char*>(env_strings[i].c_str()));
-        envp.push_back(NULL);
+		std::vector<std::string> env_strings;
+		env_strings.reserve(_env.size());
+		for (std::map<std::string, std::string>::const_iterator it = _env.begin(); it != _env.end(); ++it)
+			env_strings.push_back(it->first + "=" + it->second);
+		std::vector<char*> envp;
+		envp.reserve(env_strings.size() + 1);
+		for (size_t i = 0; i < env_strings.size(); ++i)
+			envp.push_back(const_cast<char*>(env_strings[i].c_str()));
+		envp.push_back(NULL);
 
-        execve(_path.c_str(), &argv[0], &envp[0]);
-        _exit(127);
-    }
+		execve(_path.c_str(), &argv[0], &envp[0]);
+		_exit(127);
+	}
 
-    close(_in_pipe[0]);
-    close(_out_pipe[1]);
-    _in_pipe[0] = -1;
-    _out_pipe[1] = -1;
+	close(_in_pipe[0]);
+	close(_out_pipe[1]);
+	_in_pipe[0] = -1;
+	_out_pipe[1] = -1;
 
-    // Let's try having to server set the pipe ends to non-blocking.
-    // If it that's too late, set them to non-blocking here.
-    // TEST
-    // if (fcntl(_in_pipe[1], F_SETFL, O_NONBLOCK) == -1 ||
-    //     fcntl(_out_pipe[0], F_SETFL, O_NONBLOCK) == -1) {
-    //     close(_in_pipe[1]);
-    //     close(_out_pipe[0]);
-    //     _in_pipe[1] = -1;
-    //     _out_pipe[0] = -1;
-    //     kill(pid, SIGKILL);
-    //     waitpid(pid, NULL, 0);
-    //     return false;
-    // }
+	// Let's try having to server set the pipe ends to non-blocking.
+	// If it that's too late, set them to non-blocking here.
+	// TEST
+	// if (fcntl(_in_pipe[1], F_SETFL, O_NONBLOCK) == -1 ||
+	//     fcntl(_out_pipe[0], F_SETFL, O_NONBLOCK) == -1) {
+	//     close(_in_pipe[1]);
+	//     close(_out_pipe[0]);
+	//     _in_pipe[1] = -1;
+	//     _out_pipe[0] = -1;
+	//     kill(pid, SIGKILL);
+	//     waitpid(pid, NULL, 0);
+	//     return false;
+	// }
 
-    _pid = pid;
-    _stdin_fd = _in_pipe[1];
-    _stdout_fd = _out_pipe[0];
-    _in_pipe[1] = -1;  // ownership to _stdin_fd
-    _out_pipe[0] = -1; // ownership to _stdout_fd
-    _deadline = std::time(NULL) + CGI_TIMEOUT_S;
+	_pid = pid;
+	_stdin_fd = _in_pipe[1];
+	_stdout_fd = _out_pipe[0];
+	_in_pipe[1] = -1;  // ownership to _stdin_fd
+	_out_pipe[0] = -1; // ownership to _stdout_fd
+	_deadline = std::time(NULL) + CGI_TIMEOUT_S;
 
     return true;
 }
 
 CGIProcess::~CGIProcess() {
-    if (_stdin_fd != -1) close(_stdin_fd);
-    if (_stdout_fd != -1) close(_stdout_fd);
-    if (_in_pipe[0] != -1) close(_in_pipe[0]);
-    if (_in_pipe[1] != -1) close(_in_pipe[1]);
-    if (_out_pipe[0] != -1) close(_out_pipe[0]);
-    if (_out_pipe[1] != -1) close(_out_pipe[1]);
-    if (_pid != -1 && !_reaped) {
-        kill(_pid, SIGKILL);
-        waitpid(_pid, NULL, 0);
-    }
+	if (_stdin_fd != -1) close(_stdin_fd);
+	if (_stdout_fd != -1) close(_stdout_fd);
+	if (_in_pipe[0] != -1) close(_in_pipe[0]);
+	if (_in_pipe[1] != -1) close(_in_pipe[1]);
+	if (_out_pipe[0] != -1) close(_out_pipe[0]);
+	if (_out_pipe[1] != -1) close(_out_pipe[1]);
+	if (_pid != -1 && !_reaped) {
+		kill(_pid, SIGKILL);
+		waitpid(_pid, NULL, 0);
+	}
 }
 
 bool  CGIProcess::valid()     const { return _pipes_open; }
@@ -204,9 +204,9 @@ ssize_t CGIProcess::queueIncomingData(int fd) {
 	// if (_outstream.end == _outstream.data.size())
 	// 	return 0;
 
-    // I know it is always stdoutFd()...
-    // but when we get passed the int why fetch it again via stdoutFd()
-    // just using the int directly is faster
+	// I know it is always stdoutFd()...
+	// but when we get passed the int why fetch it again via stdoutFd()
+	// just using the int directly is faster
 	// ssize_t got = _outstream.fetchData(fd, true);
  //
 	// if (got == -1) {
@@ -239,12 +239,12 @@ static bool isIgnored(const std::string& name) {
 	 * management. These are not copied from CGI.
 	 */
 	return equalCI(name, "Content-Length") ||
-			equalCI(name, "Transfer-Encoding") ||
-			equalCI(name, "Connection") ||
-			equalCI(name, "Keep-Alive") ||
-			equalCI(name, "Upgrade") ||
-			equalCI(name, "TE") ||
-			equalCI(name, "Trailer");
+		   equalCI(name, "Transfer-Encoding") ||
+		   equalCI(name, "Connection") ||
+		   equalCI(name, "Keep-Alive") ||
+		   equalCI(name, "Upgrade") ||
+		   equalCI(name, "TE") ||
+		   equalCI(name, "Trailer");
 }
 
 // trims directly against the buffer first, so there's only one extraction
@@ -345,29 +345,29 @@ void CGIProcess::consumeAvailableOutput() {
 // (see _consumeAvailableOutput()), this just transfers them onto response
 void CGIProcess::buildResponse(HTTPResponse& response, bool headers_only) const {
 
-    // a broken pipe read/write, or a malformed header line (bad field-name
-    // char), lands here instead of COMPLETE
-    // if (_state == ERROR) {
-    //     response.setStatus(INTERNAL_SERVER_ERROR);
-    //     response.setBody("", HEAP, "", headers_only);
-    //     return;
-    // }
+	// a broken pipe read/write, or a malformed header line (bad field-name
+	// char), lands here instead of COMPLETE
+	// if (_state == ERROR) {
+	//     response.setStatus(INTERNAL_SERVER_ERROR);
+	//     response.setBody("", HEAP, "", headers_only);
+	//     return;
+	// }
 
-    // if (_state != COMPLETE)
-    //     return;
+	// if (_state != COMPLETE)
+	//     return;
 
-    for (std::map<std::string, std::string>::const_iterator it = _headers.begin();
-         it != _headers.end(); ++it) {
-        response.setHeader(it->first, it->second);
-    }
+	for (std::map<std::string, std::string>::const_iterator it = _headers.begin();
+		it != _headers.end(); ++it) {
+		response.setHeader(it->first, it->second);
+	}
 
-    StatusCode status = _status;
-    // CGI/1.1: Location with no Status means client redirect
-    if (_has_location && !_has_status)
-        status = FOUND;
+	StatusCode status = _status;
+	// CGI/1.1: Location with no Status means client redirect
+	if (_has_location && !_has_status)
+		status = FOUND;
 
-    response.setStatus(status);
-    response.setBody(_body, HEAP, _content_type, headers_only);
+	response.setStatus(status);
+	response.setBody(_body, HEAP, _content_type, headers_only);
 
 }
 
@@ -423,28 +423,28 @@ bool  CGIProcess::isExpired(const std::time_t now) const { return _pid != -1 && 
 
 bool CGIProcess::tryReap(bool block) {
 
-    if (_reaped)
-        return true;
-    if (_pid == -1) {
-        _reaped = true;
-        return true;
-    }
-    int status = 0;
-    pid_t w = waitpid(_pid, &status, block ? 0 : WNOHANG);
-    if (w == 0)
-        return false;
-    _reaped = true;
-    if (w == _pid) {
-        if (WIFEXITED(status)) _exit_code = WEXITSTATUS(status);
-        else if (WIFSIGNALED(status)) _exit_code = -WTERMSIG(status);
-        else _exit_code = -1;
-    }
-    return true;
+	if (_reaped)
+		return true;
+	if (_pid == -1) {
+		_reaped = true;
+		return true;
+	}
+	int status = 0;
+	pid_t w = waitpid(_pid, &status, block ? 0 : WNOHANG);
+	if (w == 0)
+		return false;
+	_reaped = true;
+	if (w == _pid) {
+		if (WIFEXITED(status)) _exit_code = WEXITSTATUS(status);
+		else if (WIFSIGNALED(status)) _exit_code = -WTERMSIG(status);
+		else _exit_code = -1;
+	}
+	return true;
 }
 
 void CGIProcess::forceKill() {
-    if (_pid != -1)
-        kill(_pid, SIGKILL);
+	if (_pid != -1)
+		kill(_pid, SIGKILL);
 }
 
 // deprecated??
