@@ -23,7 +23,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
-#include <deque>
+// #include <deque>
 #include <ctime>
 #include <cstring>
 #include <cstddef>
@@ -145,13 +145,16 @@ private:
 	sockaddr_storage				_remote_addr;
 	socklen_t						_addrlen;
 
-	std::deque<HTTPRequest*>		_request_queue;		// FIFO queue of requests to dispatch
-	std::deque<HTTPResponse*>		_response_queue;	// FIFO queue of responses to send
+	// std::deque<HTTPRequest*>		_request_queue;		// FIFO queue of requests to dispatch
+	// std::deque<HTTPResponse*>		_response_queue;	// FIFO queue of responses to send
+
+	HTTPRequest*					_request;
+	HTTPResponse*					_response;
 
 	Buffer							_instream;
 	Buffer							_outstream;
 
-	Response						_response;
+	Response						_pending_response;
 
 	std::time_t						_last_event;
 

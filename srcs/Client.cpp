@@ -38,16 +38,18 @@ Client::Client(const sockaddr_in socket, const Config::Socket* config)
 		_config(config),
 		_server_addr(socket),
 		_addrlen(sizeof(_remote_addr)),
+		_request(NULL),
+		_response(NULL),
 		_last_event(std::time(NULL)) {
 
 	log.debug("Client Constructor called");
 
 	std::memset(&_remote_addr, 0, _addrlen);
-	_response.headers.clear();
-	_response.body.temp.clear();
-	_response.body.file.clear();
-	_response.body.size = 0;
-	_response.body.sink = NONE;
+	_pending_response.headers.clear();
+	_pending_response.body.temp.clear();
+	_pending_response.body.file.clear();
+	_pending_response.body.size = 0;
+	_pending_response.body.sink = NONE;
 
 	// Create new request object
 	pushRequest();
@@ -64,7 +66,7 @@ Client::~Client(void) {
 
 	if (_state == Client::RECEIVING_BODY) {
 		std::string path;
-		const HTTPRequest& request = *_request_queue.back();
+		const HTTPRequest& request = *_request;
 		if (!request.body.path.empty()) {
 			path = request.body.path;
 			log.error("path: " + path);
@@ -89,10 +91,12 @@ Client::~Client(void) {
 	delete cgi_process;
 	// while (!process_queue.empty()) popProcess();
 	// process_queue.clear();
-	while (!_request_queue.empty()) popRequest();
-	_request_queue.clear();
-	while (!_response_queue.empty()) popResponse();
-	_request_queue.clear();
+	// while (!_request_queue.empty()) popRequest();
+	// _request_queue.clear();
+	// while (!_response_queue.empty()) popResponse();
+	// _response_queue.clear();
+	if (_request != NULL) popRequest();
+	if (_response != NULL) popResponse();
 
 	return;
 }
@@ -137,7 +141,7 @@ const Config::Socket& Client::getConfig(void) const {
 }
 
 HTTPRequest& Client::getCurrentRequest(void) {
-	return *_request_queue.front();
+	return *_request;
 }
 
 // HTTPRequest& Client::getRecentRequest(void) {
@@ -145,7 +149,7 @@ HTTPRequest& Client::getCurrentRequest(void) {
 // }
 
 HTTPResponse& Client::getCurrentResponse(void) {
-	return *_response_queue.front();
+	return *_response;
 }
 
 Buffer& Client::getIncomingData(void) {
@@ -157,7 +161,8 @@ void Client::setState(State state) {
 }
 
 bool Client::hasPendingResponse(void) const {
-	return !_response_queue.empty();
+	// return !_response_queue.empty();
+	return _response != NULL;
 }
 
 bool Client::blockedFromReceiving(void) const {
@@ -222,7 +227,7 @@ ssize_t Client::queueIncomingData(int fd) {
 
 void Client::parseDataFromPeer(void) {
 
-	HTTPRequest& request = *_request_queue.back();
+	HTTPRequest& request = *_request;
 	// CGIProcess* process = process_queue.back();
 
 	if (request.parsing.state == HTTPRequest::READING_BODY &&
@@ -358,35 +363,35 @@ void Client::parseDataFromPeer(void) {
 
 void Client::queueOutgoingData(void) {
 
-	_response.headers	<< http::V_1_1 << http::_ << _response_queue.front()->getStatusCode()
-						<< http::_ << _response_queue.front()->getStatusReason() << http::CRLF;
+	_pending_response.headers	<< http::V_1_1 << http::_ << _response->getStatusCode()
+						<< http::_ << _response->getStatusReason() << http::CRLF;
 
-	if (!_response_queue.front()->getHeaders().empty()) {
-		std::map<std::string, std::string>::const_iterator it = _response_queue.front()->getHeaders().begin();
-		while (it != _response_queue.front()->getHeaders().end()) {
-			_response.headers << it->first << ": " << it->second << http::CRLF;
+	if (!_response->getHeaders().empty()) {
+		std::map<std::string, std::string>::const_iterator it = _response->getHeaders().begin();
+		while (it != _response->getHeaders().end()) {
+			_pending_response.headers << it->first << ": " << it->second << http::CRLF;
 			// log.debug(it->first + ": " + it->second);
 			++it;
 		}
 	}
-	_response.headers << http::CRLF;
+	_pending_response.headers << http::CRLF;
 
-	_response.body.sink = _response_queue.front()->getBodySink();
-	switch (_response.body.sink) {
+	_pending_response.body.sink = _response->getBodySink();
+	switch (_pending_response.body.sink) {
 
 	case HEAP:
-		_response.body.temp << _response_queue.front()->getBody();
-		_response.body.size = _response_queue.front()->getBodySize();
+		_pending_response.body.temp << _response->getBody();
+		_pending_response.body.size = _response->getBodySize();
 		break;
 
 	case DISK:
-		_response.body.file.open(_response_queue.front()->getBody().c_str(), std::ios::binary);
-		if (!_response.body.file.is_open()) {
+		_pending_response.body.file.open(_response->getBody().c_str(), std::ios::binary);
+		if (!_pending_response.body.file.is_open()) {
 			log.error("preparing send: unable to open file");
-			_response.body.sink = NONE;
+			_pending_response.body.sink = NONE;
 			break;
 		}
-		_response.body.size = _response_queue.front()->getBodySize();
+		_pending_response.body.size = _response->getBodySize();
 		break;
 
 	case NONE:
@@ -438,28 +443,28 @@ void Client::sendDataToTCPPeer(int fd) {
 
 		log.info("client_" + i2a(fd) + " sending response headers");
 
-		data = &_response.headers;
+		data = &_pending_response.headers;
 		break;
 
 	case SENDING_BODY:
 
 		log.info("client_" + i2a(fd) + " sending response body");
 
-		switch (_response.body.sink) {
+		switch (_pending_response.body.sink) {
 
 		case HEAP:
 
-			data = &_response.body.temp;
+			data = &_pending_response.body.temp;
 			break;
 
 		case DISK:
 
 			if (_outstream.data.size() == BUFFER_SIZE) {
-				std::size_t buffer_size = _adjustBufferSize(_response.body.size);
+				std::size_t buffer_size = _adjustBufferSize(_pending_response.body.size);
 				_outstream.data.resize(buffer_size);
 			}
 
-			data = &_response.body.file;
+			data = &_pending_response.body.file;
 			break;
 
 		default:
@@ -507,7 +512,7 @@ void Client::sendDataToTCPPeer(int fd) {
 
 		case SENDING_HEADERS:
 
-			if (_response.body.sink == NONE) {
+			if (_pending_response.body.sink == NONE) {
 				log.info("client_" + i2a(fd) + ": full response sent");
 				_stateTransitionHandler(fd);
 			} else {
@@ -520,7 +525,7 @@ void Client::sendDataToTCPPeer(int fd) {
 
 			log.info("client_" + i2a(fd) + ": full body/file sent");
 			_stateTransitionHandler(fd);
-			if (_response.body.sink == DISK && _outstream.data.size() != BUFFER_SIZE) {
+			if (_pending_response.body.sink == DISK && _outstream.data.size() != BUFFER_SIZE) {
 				_outstream.data.resize(BUFFER_SIZE);
 			}
 			break;
@@ -536,8 +541,9 @@ void Client::sendDataToTCPPeer(int fd) {
 // Create new request object
 void Client::pushRequest(void) {
 
-	HTTPRequest* request = new HTTPRequest((sockaddr_in*)&_remote_addr, &_server_addr);
-	_request_queue.push_back(request);
+	// HTTPRequest* request = new HTTPRequest((sockaddr_in*)&_remote_addr, &_server_addr);
+	// _request_queue.push_back(request);
+	_request = new HTTPRequest((sockaddr_in*)&_remote_addr, &_server_addr);;
 
 	return;
 }
@@ -545,8 +551,9 @@ void Client::pushRequest(void) {
 // Create new response object
 void Client::pushResponse(void) {
 
-	HTTPResponse* response = new HTTPResponse;
-	_response_queue.push_back(response);
+	// HTTPResponse* response = new HTTPResponse;
+	// _response_queue.push_back(response);
+	_response = new HTTPResponse;
 
 	return;
 }
@@ -554,8 +561,10 @@ void Client::pushResponse(void) {
 // Delete processed request object
 void Client::popRequest(void) {
 
-	delete _request_queue.front();
-	_request_queue.pop_front();
+	// delete _request_queue.front();
+	// _request_queue.pop_front();
+	delete _request;
+	_request = NULL;
 
 	return;
 }
@@ -563,8 +572,10 @@ void Client::popRequest(void) {
 // Delete processed response object
 void Client::popResponse(void) {
 
-	delete _response_queue.front();
-	_response_queue.pop_front();
+	// delete _response_queue.front();
+	// _response_queue.pop_front();
+	delete _response;
+	_response = NULL;
 
 	return;
 }
@@ -598,16 +609,18 @@ void Client::reset(void) {
 
 	// while (!process_queue.empty()) popProcess();
 	// process_queue.clear();
-	while (!_request_queue.empty()) popRequest();
-	_request_queue.clear();
-	while (!_response_queue.empty()) popResponse();
-	_response_queue.clear();
+	// while (!_request_queue.empty()) popRequest();
+	// _request_queue.clear();
+	// while (!_response_queue.empty()) popResponse();
+	// _response_queue.clear();
+	if (_request !=  NULL) popRequest();
+	if (_response != NULL) popResponse();
 
-	_response.headers.clear();
-	_response.body.temp.clear();
-	_response.body.file.clear();
-	_response.body.size = 0;
-	_response.body.sink = NONE;
+	_pending_response.headers.clear();
+	_pending_response.body.temp.clear();
+	_pending_response.body.file.clear();
+	_pending_response.body.size = 0;
+	_pending_response.body.sink = NONE;
 	_instream.data.resize(BUFFER_SIZE);
 	_instream.reset();
 	_outstream.data.resize(BUFFER_SIZE);
