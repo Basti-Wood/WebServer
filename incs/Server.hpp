@@ -67,7 +67,7 @@ private:
 	void									_handleSocketWriteEvent(std::map<int, Client*>::iterator it);
 	void									_handlePipeWriteEvent(std::map<int, Client*>::iterator it);
 
-	void									_staleClientReaper(const std::time_t now);
+	void									_reapStaleClients(const std::time_t now);
 
 	void									_cleanUpAllRessources(void);
 	void									_cleanUpScriptPipeEnd(std::map<int, Client*>::iterator it);
@@ -76,7 +76,8 @@ private:
 
 	static const unsigned short				MAX_EPOLL_EVENTS = 64; // 64 - 512
 	static const unsigned short				EPOLL_WAIT_TIMEOUT_MS = 5000; // 100 - 5000
-	static const unsigned short				STALE_CLIENT_SWEEP_INTERVAL = 2;
+	static const unsigned short				STALE_CLIENT_REAP_INTERVAL = 2;
+	static const unsigned short				EXPIRED_SESSIONS_SWEEP_INTERVAL = 120;
 
 	int										_epfd;
 
@@ -93,6 +94,7 @@ private:
 	epoll_event								_events[MAX_EPOLL_EVENTS];
 
 	std::time_t								_last_sweep;
+	std::time_t								_last_reap;
 
 };
 

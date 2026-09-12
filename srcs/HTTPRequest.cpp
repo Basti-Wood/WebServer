@@ -32,6 +32,7 @@ HTTPRequest::HTTPRequest(const sockaddr_in* remote_socket, const sockaddr_in* se
 	cgi.remote_socket = *remote_socket;
 	cgi.server_socket = *server_socket;
 	headers_only = false;
+	requires_CGI = false;
 	is_multipart = false;
 	body_chunked = false;
 	created_file = false;
@@ -178,6 +179,9 @@ void HTTPRequest::reset(void) {
 	resolved.domain = NULL;
 	resolved.location = NULL;
 	headers_only = false;
+	requires_CGI = false;
+	is_multipart = false;
+	body_chunked = false;
 	created_file = false;
 	_method = METHOD_COUNT;
 	_path.clear();
@@ -199,6 +203,9 @@ HTTPRequest::HTTPRequest(const HTTPRequest& other)
 	:	parsing(other.parsing),
 		resolved(other.resolved),
 		headers_only(other.headers_only),
+		requires_CGI(other.requires_CGI),
+		is_multipart(other.is_multipart),
+		body_chunked(other.body_chunked),
 		created_file(other.created_file),
 		_method(other._method),
 		_path(other._path),
@@ -216,13 +223,16 @@ HTTPRequest& HTTPRequest::operator = (const HTTPRequest& other) {
 		parsing = other.parsing;
 		resolved = other.resolved;
 		headers_only = other.headers_only;
+		requires_CGI = other.requires_CGI;
+		is_multipart = other.is_multipart;
+		body_chunked = other.body_chunked;
 		created_file = other.created_file;
 		_method = other._method;
 		_path = other._path;
 		_query = other._query;
 		_version = other._version;
 		_headers = other._headers;
-		_session = NULL;
+		_session = other._session;
 	}
 	log.debug("HTTPRequest Copy Assignment Operator called");
 	return *this;

@@ -61,12 +61,12 @@ void SessionManager::getSession(Client& client) {
 		}
 	}
 
-	Session session;
-	request.setSession(session);
+	Session* session = new Session();
+	request.setSession(*session);
 	session_id = randomHexString(SESSION_ID_BYTE_WIDTH);
 	request.setSessionID(session_id);
-	_sessions[session_id] = &session;
-	const std::string cookie_header = setUpCookieHeader(session_id, session);
+	_sessions[session_id] = session;
+	const std::string cookie_header = setUpCookieHeader(session_id, *session);
 	response.setHeader("Set-Cookie", cookie_header);
 	client.setState(Client::DISPATCHING);
 	return;
@@ -83,6 +83,25 @@ void SessionManager::setAttribute(const std::string& session_id, const std::stri
 	return;
 }
 
+void SessionManager::_sweepExpiredSessions(const std::time_t now) {
+
+	std::map<std::string, Session*>::iterator immediate;
+	std::map<std::string, Session*>::iterator it = _sessions.begin();
+
+	while (it != _sessions.end()) {
+
+		immediate = it;
+		++it;
+
+		if (immediate->second->getExpirationTime() > now) {
+			delete immediate->second;
+			_sessions.erase(immediate);
+		}
+	}
+
+	return;
+}
+
   //~~~~~~~~~~~//
  /*  Private  */
 //~~~~~~~~~~~//
@@ -96,6 +115,19 @@ SessionManager::SessionManager(void) {
 /*	@brief Destructor	*/
 SessionManager::~SessionManager(void) {
 	log.debug("SessionManager Destructor called");
+
+	if (!_sessions.empty()) {
+		std::map<std::string, Session*>::iterator immediate;
+		std::map<std::string, Session*>::iterator it = _sessions.begin();
+		while (it != _sessions.end()) {
+			immediate = it;
+			++it;
+			delete immediate->second;
+			_sessions.erase(immediate);
+		}
+		_sessions.clear();
+	}
+
 	return;
 }
 

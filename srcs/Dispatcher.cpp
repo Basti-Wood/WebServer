@@ -38,7 +38,6 @@ static bool isReadable(const std::string& path) {
 	}
 
 	return access(path.c_str(), R_OK) == 0;
-
 }
 
 static std::string findIndexFile(const Config::Location& location,
@@ -52,7 +51,6 @@ static std::string findIndexFile(const Config::Location& location,
 	}
 
 	return "";
-
 }
 
 static std::string extractDomainName(const std::string& host_header) {
@@ -183,7 +181,6 @@ static bool normalizePath(const std::string& path, std::string& result) {
 	}
 
 	return true;
-
 }
 
 static std::string matchContentType(const std::string& path) {
@@ -200,7 +197,6 @@ static std::string matchContentType(const std::string& path) {
 			return "application/octet-stream";
 		}
 	}
-
 }
 
 static StatusCode serveFile(const std::string& path,
@@ -226,7 +222,6 @@ static StatusCode serveFile(const std::string& path,
 	response.setBody(path, DISK, content_type, request.headers_only);
 
 	return OK;
-
 }
 
 static StatusCode removeFile(const std::string& path,
@@ -241,7 +236,6 @@ static StatusCode removeFile(const std::string& path,
 	response.setHeader("Connection", "keep-alive");
 
 	return NO_CONTENT;
-
 }
 
 // static StatusCode prepareCGI(HTTPRequest& request, HTTPResponse& response) {
@@ -308,7 +302,6 @@ static StatusCode serveDirectoryListing(const std::string& path,
 
 	response.setBody(body.str(), HEAP, "text/html", request.headers_only);
 	return OK;
-
 }
 
 static StatusCode handleRedirect(const std::string& path,
@@ -342,7 +335,6 @@ static StatusCode handleRedirect(const Config::Location& location,
 	response.setBody(body.str(), HEAP, "text/plain", request.headers_only);
 
 	return MOVED_PERMANENTLY;
-
 }
 
 static StatusCode handleGET(const HTTPRequest& request,
@@ -377,7 +369,6 @@ static StatusCode handleGET(const HTTPRequest& request,
 	} else {
 		return FORBIDDEN;
 	}
-
 }
 
 // static StatusCode handleCGI(HTTPRequest& request, HTTPResponse& response) {
@@ -408,7 +399,6 @@ static StatusCode handlePOST(const HTTPRequest& request,
 	response.setBody("Uploaded\n", HEAP, "text/plain", request.headers_only);
 
 	return CREATED;
-
 }
 
 static StatusCode routeCGI(HTTPRequest& request) {
@@ -454,7 +444,6 @@ static StatusCode handleRegularFile(HTTPRequest& request,
 		default:
 			return NOT_IMPLEMENTED;
 	}
-
 }
 
 static StatusCode handleDirectory(HTTPRequest& request,
@@ -487,7 +476,6 @@ static StatusCode handleDirectory(HTTPRequest& request,
 	default:
 		return NOT_IMPLEMENTED;
 	}
-
 }
 
 static StatusCode routeRequest(HTTPRequest& request, HTTPResponse& response) {
@@ -610,7 +598,7 @@ static StatusCode resolveRoute(Client& client) {
 	log.debug("absolute file path: " + request.resolved.filepath);
 
 	// Only after path resolving succeeds decode path_info
-	if (!decodeURL(path_info, request.cgi.path_info)) {
+	if (!path_info.empty() && !decodeURL(path_info, request.cgi.path_info)) {
 		log.error("dispatch error: malformed CGI path info");
 		return BAD_REQUEST;
 	}
@@ -622,7 +610,6 @@ static StatusCode resolveRoute(Client& client) {
 	}
 
 	return NO_STATUS;
-
 }
 
   //~~~~~~~~~~//
@@ -769,7 +756,6 @@ void Dispatcher::handleRequest(Client& client) {
 
 	client.setState(Client::PENDING_RESPONSE);
 	return;
-
 }
 
 void Dispatcher::buildErrorResponse(const StatusCode& code,
@@ -811,7 +797,6 @@ void Dispatcher::buildErrorResponse(const StatusCode& code,
 	}
 
 	return;
-
 }
 
 static bool startsWith(const std::string& requested_path,
@@ -824,7 +809,6 @@ static bool startsWith(const std::string& requested_path,
 	}
 
 	return requested_path.compare(0, config_location_path_len, config_location_path) == 0;
-
 }
 
 const Config::Location* Dispatcher::resolveLocation(const std::vector<Config::Location>& locations,
@@ -866,7 +850,6 @@ const Config::Location* Dispatcher::resolveLocation(const std::vector<Config::Lo
 	}
 
 	return matched_location;
-
 }
 
 Dispatcher::content_type_map Dispatcher::initContentTypeMap(void) {
@@ -890,7 +873,6 @@ Dispatcher::content_type_map Dispatcher::initContentTypeMap(void) {
 	content_types[".xml"] = "application/xml";
 
 	return content_types;
-
 }
 
   //~~~~~~~~~~~//

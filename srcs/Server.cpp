@@ -33,7 +33,7 @@ static volatile sig_atomic_t should_exit = 0;
 
 static void signal_handler(int sig) {
     if (sig == SIGTERM || sig == SIGINT) {
-		log.info("Connection closed by the server");
+		log.info("Connection(s) closed by the server");
         should_exit = 1;
     }
     return;
@@ -263,7 +263,7 @@ void Server::handleEvents(void) {
 
 		case -1:
 			// throw std::runtime_error("epoll_wait: " + std::string(strerror(errno)));
-			log.error("epoll_wait: " + std::string(strerror(errno)));
+			log.warn("epoll_wait: " + std::string(strerror(errno)));
 			break;
 // DEBUG BEGIN
 		case 0:
@@ -280,7 +280,7 @@ void Server::handleEvents(void) {
 			int fd = _events[n].data.fd;
 			epoll_event ev = _events[n];
 			uint32_t events = ev.events;
-			bool tcp_peer_alive = false;
+			bool tcp_peer_alive = true;
 
 			std::map<int, ListeningSocket>::const_iterator listen_socket = _sockets.find(fd);
 			if (listen_socket != _sockets.end() && events & EPOLLIN) {
@@ -322,15 +322,14 @@ void Server::handleEvents(void) {
 			break;
 		}
 
-		if (_clients.empty()) {
-			log.info("All clients disconnected");
-			break;
-		}
-
 		const std::time_t now = std::time(NULL);
-		if (std::difftime(now, _last_sweep) > STALE_CLIENT_SWEEP_INTERVAL) {
-			_staleClientReaper(now);
+		if (std::difftime(now, _last_sweep) > EXPIRED_SESSIONS_SWEEP_INTERVAL) {
+			session_manager._sweepExpiredSessions(now);
 			_last_sweep = now;
+		}
+		if (std::difftime(now, _last_reap) > STALE_CLIENT_REAP_INTERVAL) {
+			_reapStaleClients(now);
+			_last_reap = now;
 		}
 	}
 	return;
@@ -656,7 +655,7 @@ void Server::_handlePipeWriteEvent(std::map<int, Client*>::iterator it) {
 	return;
 }
 
-void Server::_staleClientReaper(const std::time_t now) {
+void Server::_reapStaleClients(const std::time_t now) {
 
 	std::map<int, Client*>::iterator immediate;
 	std::map<int, Client*>::iterator it = _clients.begin();
@@ -836,8 +835,11 @@ void Server::_cleanUpSocket(std::map<int, ListeningSocket>::iterator it) {
 //~~~~~~~~~~~//
 
 /*	@brief Constructor	*/
-Server::Server(void) : _last_sweep(std::time(NULL)) {
+Server::Server(void) {
 	log.debug("Server Constructor called");
+	const std::time_t now = std::time(NULL);
+	_last_sweep = now;
+	_last_reap = now;
 	_epfd = -1;
 	return;
 }

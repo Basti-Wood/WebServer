@@ -31,6 +31,8 @@ public:
 	void								setAttribute(const std::string& session_id,
 													 const std::string& attribute);
 
+	void								_sweepExpiredSessions(const std::time_t now);
+
 private:
 
 	SessionManager(void);
