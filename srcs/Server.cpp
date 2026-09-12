@@ -422,7 +422,7 @@ bool Server::_handleSocketReadEvent(std::map<int, Client*>::iterator it) {
 		client.parseDataFromPeer();
 
 		if (client.getState() == Client::RETRIEVING_SESSION) {
-			session_manager.getSession(client);
+			session_manager.retrieveSession(client);
 		}
 
 		if (client.getState() == Client::DISPATCHING) {

@@ -75,9 +75,9 @@ private:
 	void									_cleanUpSocket(std::map<int, ListeningSocket>::iterator it);
 
 	static const unsigned short				MAX_EPOLL_EVENTS = 64; // 64 - 512
-	static const unsigned short				EPOLL_WAIT_TIMEOUT_MS = 5000; // 100 - 5000
+	static const unsigned short				EPOLL_WAIT_TIMEOUT_MS = 5000; // 100 - 5000 what about 293?
 	static const unsigned short				STALE_CLIENT_REAP_INTERVAL = 2;
-	static const unsigned short				EXPIRED_SESSIONS_SWEEP_INTERVAL = 120;
+	static const unsigned short				EXPIRED_SESSIONS_SWEEP_INTERVAL = 307;
 
 	int										_epfd;
 

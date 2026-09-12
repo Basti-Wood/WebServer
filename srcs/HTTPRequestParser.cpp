@@ -328,10 +328,10 @@ bool RequestParser::_parseHeaders(const Buffer& buffer, HTTPRequest& request) {
 				}
 			}
 
-			const std::string* session_id = request.getCookie("session_id");
-			if (session_id != NULL) {
-				request.setSessionID(*session_id);
-			}
+			// const std::string* session_id = request.getCookie("Session_ID");
+			// if (session_id != NULL) {
+			// 	request.setSessionID(*session_id);
+			// }
 
 			const std::string* transfer_endcoding = request.getHeader("transfer-encoding");
 			if (transfer_endcoding != NULL && equalCI(*transfer_endcoding, "chunked")) {

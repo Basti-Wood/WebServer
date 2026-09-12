@@ -15,7 +15,7 @@
 
 #include "HTTPParameters.hpp"
 #include "HTTPResponse.hpp"
-#include "Session.hpp"
+// #include "Session.hpp"
 #include <sstream>
 #include <string>
 #include <cstring>
@@ -250,7 +250,7 @@ public:
 	const std::string&									getVersion(void) const;
 	const std::string*									getHeader(const std::string& key) const;
 	const std::map<std::string, std::string>&			getHeaders(void) const;
-	const std::string*									getCookie(const std::string& key) const;
+	// const std::string*									getCookie(const std::string& key) const;
 	const std::string&									getSessionID(void) const;
 
 	const std::stringstream&							getBody(void) const;
@@ -261,8 +261,8 @@ public:
 	void												setVersion(const std::string&);
 	void												setHeader(const std::string& key, const std::string& value);
 	void												setCookie(const Cookie& cookie);
+	// void												setSession(const Session& session);
 	void												setSessionID(const std::string& session_id);
-	void												setSession(const Session& session);
 
 	bool												extractContentLength(void);
 
@@ -285,7 +285,7 @@ private:
 
 	std::string											_session_id;
 
-	const Session*										_session;
+	// const Session*										_session;
 
 };
 

@@ -126,7 +126,7 @@ private:
 	Client(const Client& other);
 	Client& operator = (const Client& other);
 
-	static const unsigned short		REQUEST_ID_BYTE_WIDTH = 6;
+	// static const unsigned short		REQUEST_ID_BIT_WIDTH = 48;
 
 	static const std::time_t		IDLE_TIMEOUT_SECONDS		= 60;
 	static const std::time_t		HEADER_TIMEOUT_SECONDS		= 12;

@@ -19,8 +19,8 @@
 // #include <cstddef>
 #include <sys/epoll.h>
 
-static const unsigned short TEMPORARY_SUFFIX_BYTE_WIDTH = 5;
-static const unsigned short SUFFIX_BYTE_WIDTH = 7;
+static const unsigned short TEMPORARY_SUFFIX_BIT_WIDTH = 40;
+static const unsigned short SUFFIX_BIT_WIDTH = 56;
 
 // DEBUG BEGIN
 // static const short STOP = -2;
@@ -36,7 +36,7 @@ int				stringToInt(const std::string& str);
 
 std::string		trim(const std::string& str);
 std::string		unquote(const std::string& str);
-std::string		randomHexString(unsigned short width);
+std::string		randomHexString(unsigned short bit_width);
 
 bool			isRegularFile(const std::string& path);
 bool			isDirectory(const std::string& path);

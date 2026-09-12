@@ -226,11 +226,11 @@ std::string unquote(const std::string& str) {
 	return str;
 }
 
-std::string randomHexString(unsigned short byte_width) {
+std::string randomHexString(unsigned short bit_width) {
 
 	static const char hex[] = "0123456789abcdef";
 
-	unsigned char* bytes = new unsigned char[byte_width];
+	unsigned char* bytes = new unsigned char[bit_width / 8];
 
 	try {
 		std::ifstream urandom("/dev/urandom", std::ios::in | std::ios::binary);
@@ -239,16 +239,16 @@ std::string randomHexString(unsigned short byte_width) {
 			throw std::runtime_error("cannot open /dev/urandom");
 		}
 
-		urandom.read(reinterpret_cast<char*>(bytes), static_cast<std::streamsize>(byte_width));
+		urandom.read(reinterpret_cast<char*>(bytes), static_cast<std::streamsize>(bit_width / 8));
 
-		if (urandom.gcount() != static_cast<std::streamsize>(byte_width)) {
+		if (urandom.gcount() != static_cast<std::streamsize>(bit_width / 8)) {
 			throw std::runtime_error("cannot read /dev/urandom");
 		}
 
 		std::string result;
-		result.reserve(static_cast<std::size_t>(byte_width) * 2);
+		result.reserve(static_cast<std::size_t>(bit_width / 8) * 2);
 
-		for (std::size_t i = 0; i < static_cast<std::size_t>(byte_width); ++i) {
+		for (std::size_t i = 0; i < static_cast<std::size_t>(bit_width / 8); ++i) {
 			result += hex[bytes[i] >> 4];
 			result += hex[bytes[i] & 0x0f];
 		}
@@ -260,7 +260,7 @@ std::string randomHexString(unsigned short byte_width) {
 		delete [] bytes;
 		log.error("hexgen: " + std::string(e.what()) + ". Falling back to std::rand");
 		std::string unique_id;
-		while (unique_id.empty() || unique_id.size() < static_cast<std::size_t>(byte_width) * 2) {
+		while (unique_id.empty() || unique_id.size() < static_cast<std::size_t>(bit_width / 8) * 2) {
 			unique_id += i2a(std::rand());
 		}
 		return unique_id;
@@ -301,7 +301,7 @@ void createFile(HTTPRequest& request) {
 	const std::time_t timestamp = std::time(NULL);
 	do {
 		try {
-			suffix = randomHexString(TEMPORARY_SUFFIX_BYTE_WIDTH);
+			suffix = randomHexString(TEMPORARY_SUFFIX_BIT_WIDTH);
 		} catch (std::exception& e) {
 			log.warn("random hex string generator: " + std::string(e.what()));
 			std::stringstream oss;
@@ -360,7 +360,7 @@ void promoteFile(HTTPRequest& request) {
 	std::string suffix;
 	const std::time_t timestamp = std::time(NULL);
 	try {
-		suffix = randomHexString(SUFFIX_BYTE_WIDTH);
+		suffix = randomHexString(SUFFIX_BIT_WIDTH);
 	} catch (std::exception& e) {
 		log.warn("random hex string generator: " + std::string(e.what()));
 		std::stringstream oss;

@@ -41,7 +41,7 @@ HTTPRequest::HTTPRequest(const sockaddr_in* remote_socket, const sockaddr_in* se
 	_query.clear();
 	_version.clear();
 	_headers.clear();
-	_session = NULL;
+	// _session = NULL;
 	return;
 }
 
@@ -88,15 +88,14 @@ const std::string* HTTPRequest::getHeader(const std::string& key) const {
 
 }
 
-const std::string* HTTPRequest::getCookie(const std::string& name) const {
-
-	for (std::vector<Cookie>::const_iterator it = _cookies.begin(); it != _cookies.end(); ++it) {
-		if (it->name == name) {
-			return &it->value;
-		}
-	}
-	return NULL;
-}
+// const std::string* HTTPRequest::getCookie(const std::string& name) const {
+// 	for (std::vector<Cookie>::const_iterator it = _cookies.begin(); it != _cookies.end(); ++it) {
+// 		if (it->name == name) {
+// 			return &it->value;
+// 		}
+// 	}
+// 	return NULL;
+// }
 
 const std::string& HTTPRequest::getSessionID(void) const {
 	return _session_id;
@@ -152,9 +151,9 @@ void HTTPRequest::setSessionID(const std::string& session_id) {
 	return;
 }
 
-void HTTPRequest::setSession(const Session& session) {
-	_session = &session;
-}
+// void HTTPRequest::setSession(const Session& session) {
+// 	_session = &session;
+// }
 
 bool HTTPRequest::extractContentLength(void) {
 
@@ -188,7 +187,7 @@ void HTTPRequest::reset(void) {
 	_query.clear();
 	_version.clear();
 	_headers.clear();
-	_session = NULL;
+	// _session = NULL;
 
 	return;
 
@@ -211,8 +210,8 @@ HTTPRequest::HTTPRequest(const HTTPRequest& other)
 		_path(other._path),
 		_query(other._query),
 		_version(other._version),
-		_headers(other._headers),
-		_session(other._session) {
+		_headers(other._headers) {
+		// _session(other._session) {
 	log.debug("HTTPRequest Copy Constructor called");
 	return;
 }
@@ -232,7 +231,7 @@ HTTPRequest& HTTPRequest::operator = (const HTTPRequest& other) {
 		_query = other._query;
 		_version = other._version;
 		_headers = other._headers;
-		_session = other._session;
+		// _session = other._session;
 	}
 	log.debug("HTTPRequest Copy Assignment Operator called");
 	return *this;

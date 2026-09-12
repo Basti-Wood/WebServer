@@ -40,8 +40,8 @@ std::time_t Session::getExpirationTime(void) const {
 	return _expiresAt;
 }
 
-void Session::uptdateTimeStamp(void) {
-	_touchedAt = std::time(NULL);
+void Session::uptdateTimeStamp(const std::time_t now) {
+	_touchedAt = now;
 	_expiresAt = _touchedAt + LIFETIME;
 	return;
 }
