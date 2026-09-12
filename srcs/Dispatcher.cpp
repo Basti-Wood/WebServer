@@ -555,23 +555,26 @@ static StatusCode resolveRoute(Client& client) {
 	std::string path = request.getPath();
 	for (std::map<std::string, std::string>::const_iterator it = request.resolved.location->interpreters.begin();
 		it != request.resolved.location->interpreters.end(); ++it) {
-		size_t pos = path.find(it->first);
-		if (pos != std::string::npos) {
-			pos += it->first.size();
-			if (pos == path.size()) {
+		size_t search_from = 0;
+		size_t pos;
+		while ((pos = path.find(it->first, search_from)) != std::string::npos) {
+			size_t end = pos + it->first.size();
+			if (end == path.size()) {
 				request.requires_CGI = true;
 				request.cgi.binary_path = it->second;
 				break;
-			} else if (path[pos] == '/') {
-				path_info = path.substr(pos);
-				path.erase(pos);
+			} else if (path[end] == '/') {
+				path_info = path.substr(end);
+				path.erase(end);
 				request.requires_CGI = true;
 				request.cgi.binary_path = it->second;
 				break;
 			} else {
-				continue;
+				search_from = pos + 1;
 			}
 		}
+		if (request.requires_CGI)
+			break;
 	}
 
 	// Decode and normalize path, then check for traversal attempts
