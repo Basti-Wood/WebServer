@@ -98,16 +98,16 @@ RequestParser::~RequestParser() {
 	return;
 };
 
-ssize_t RequestParser::_findRequestLineEnd(const Buffer& buffer, HTTPRequest& request) {
+std::size_t RequestParser::_findRequestLineEnd(const Buffer& buffer, HTTPRequest& request) {
 
 	ssize_t LF_pos = buffer.find(http::LF);
 	if (LF_pos == -1) return std::string::npos;
 	if (LF_pos != 0 && buffer.data[LF_pos - 1] == http::CR) {
 		request.parsing.line_ending = HTTPRequest::CRLF;
-		return LF_pos - 1;
+		return static_cast<std::size_t>(LF_pos) - 1;
 	}
 
-	return LF_pos;
+	return static_cast<std::size_t>(LF_pos);
 }
 
 bool RequestParser::_extractTokens(const Buffer& buffer, HTTPRequest& request) {
@@ -273,8 +273,8 @@ bool RequestParser::_parseRequestLine(const Buffer& buffer, HTTPRequest& request
 	// Line feed detected (end of request line): procced with line parsing
 	} else {
 
-		request.parsing.bytes_read_count =	request.parsing.line_end_pos +
-											request.parsing.line_end_size;
+		request.parsing.bytes_read_count = request.parsing.line_end_pos +
+										   request.parsing.line_end_size;
 
 		if (!_extractTokens(buffer, request)) {
 			request.parsing.state = HTTPRequest::ERROR;
@@ -460,7 +460,8 @@ bool RequestParser::_parseHeaders(const Buffer& buffer, HTTPRequest& request) {
 			return false;
 		}
 
-		request.parsing.bytes_read_count = request.parsing.line_end_pos + request.parsing.line_end_size;
+		request.parsing.bytes_read_count = request.parsing.line_end_pos +
+										   request.parsing.line_end_size;
 		return true;
 
 	}

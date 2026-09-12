@@ -45,7 +45,7 @@ private:
 	static const std::size_t				LFLF_SIZE = 2;
 	static const std::size_t				CRLFCRLF_SIZE = 4;
 
-	ssize_t									_findRequestLineEnd(const Buffer& buffer, HTTPRequest& request);
+	std::size_t								_findRequestLineEnd(const Buffer& buffer, HTTPRequest& request);
 
 	bool									_extractTokens(const Buffer& buffer, HTTPRequest& request);
 	bool									_parseHeaderLine(const Buffer& buffer, HTTPRequest& request);

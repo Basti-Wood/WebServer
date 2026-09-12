@@ -505,9 +505,9 @@ void Server::_handlePipeReadEvent(std::map<int, Client*>::iterator it) {
 		log.warn("read: " + std::string(strerror(errno)));
 		_cleanUpScriptPipeEnd(it);
 		dispatcher.buildErrorResponse(INTERNAL_SERVER_ERROR,
-										client.getCurrentRequest().resolved.location,
-										client.getCurrentRequest().headers_only,
-										client.getCurrentResponse());
+									  client.getCurrentRequest().resolved.location,
+									  client.getCurrentRequest().headers_only,
+									  client.getCurrentResponse());
 		client.setState(Client::PENDING_RESPONSE);
 		log.debug("client_" + i2a(it->first) + ": state set to PENDING_RESPONSE");
 		client.popRequest();
@@ -528,8 +528,25 @@ void Server::_handlePipeReadEvent(std::map<int, Client*>::iterator it) {
 
 		client.uptdateTimeStamp();
 		// TEST have CGIProcess consume the data in the buffer
-		client.cgi_process->consumeAvailableOutput();
-
+		try {
+			client.cgi_process->consumeAvailableOutput();
+		} catch (std::exception& e) {
+			log.warn("read: " + std::string(e.what()));
+			_cleanUpScriptPipeEnd(it);
+			dispatcher.buildErrorResponse(INTERNAL_SERVER_ERROR,
+										  client.getCurrentRequest().resolved.location,
+										  client.getCurrentRequest().headers_only,
+										  client.getCurrentResponse());
+			client.setState(Client::PENDING_RESPONSE);
+			log.debug("client_" + i2a(it->first) + ": state set to PENDING_RESPONSE");
+			client.popRequest();
+			if (!_setWRONLYInterest(it->first)) {
+				_cleanUpClient(it);
+				return;
+			}
+			client.markForTermination();
+			return;
+		}
 	}
 
 	if (client.getState() ==  Client::PREPARING_RESPONSE) {

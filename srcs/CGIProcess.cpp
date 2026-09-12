@@ -1,4 +1,5 @@
 #include "../incs/CGIProcess.hpp"
+#include "../incs/templates.hpp"
 #include "../incs/constexpr.hpp"
 #include "../incs/utils.hpp"
 
@@ -23,7 +24,8 @@ CGIProcess::CGIProcess(const std::string& path, const std::vector<std::string>& 
 	_reaped(false), _exit_code(-1), _deadline(0),
 	// _state(WRITING_PIPES),
 	_status(OK), _content_type("text/html"),
-	_has_status(false), _has_location(false), _headers_done(false) {
+	_has_status(false), _has_location(false), _headers_done(false),
+	_line_ending(LF), _line_end_size(LF_SIZE) {
 
 	_in_pipe[0] = -1; _in_pipe[1] = -1;
 	_out_pipe[0] = -1; _out_pipe[1] = -1;
@@ -247,69 +249,109 @@ static bool isIgnored(const std::string& name) {
 		   equalCI(name, "Trailer");
 }
 
+std::size_t CGIProcess::_findHeaderLineEnd() {
+
+	ssize_t LF_pos = _outstream.find(http::LF);
+	if (LF_pos == -1) return std::string::npos;
+	if (LF_pos != 0 && _outstream.data[LF_pos - 1] == http::CR) {
+		_line_ending = CRLF;
+		_line_end_size = CRLF_SIZE;
+		return static_cast<std::size_t>(LF_pos) - 1;
+   }
+
+	return static_cast<std::size_t>(LF_pos);
+}
+
 // trims directly against the buffer first, so there's only one extraction
 // (already trimmed) instead of one to pull the raw line out and another
 // inside trim()
-bool CGIProcess::_consumeHeaderLine(std::size_t line_len) {
+bool CGIProcess::_consumeHeaderLine() {
 
-	std::size_t last = line_len;
-	if (last > 0 && _outstream.data[_outstream.begin + last - 1] == '\r')
-		--last;
+	size_t line_end_pos = _findHeaderLineEnd();
 
-	if (last == 0)
-		return true; // blank line, headers are done
+	if (line_end_pos == 0) {
 
-	if (isLineWS(_outstream.data[_outstream.begin]))
+		// blank line, headers are done
+		_outstream.mark = _outstream.begin + _line_end_size;
+		_headers_done = true;
+		return true;
+
+	} else if (line_end_pos == std::string::npos) {
+
+		_outstream.mark = _outstream.begin;
 		return false;
 
-	std::size_t colon = 0;
-	while (colon < last && _outstream.data[_outstream.begin + colon] != ':')
-		++colon;
-	if (colon == last)
-		return false;
+	} else {
 
-	// field-name is a token: no whitespace or separators allowed, so this
-	// also catches "Content-Type : text/plain" (space before the colon
-	// ends up inside key, and ' ' isn't a tchar)
-	for (std::size_t i = 0; i < colon; ++i) {
-		if (!isTChar(_outstream.data[_outstream.begin + i])) {
-			// _state = ERROR;
-			return false;
+		// RFC 3875: No whitespace before the field-name and before the colon.
+		if (isLineWS(_outstream.data[_outstream.begin])) {
+			throw std::runtime_error("CGI response: no whitespaces in field-name allowed");
 		}
-	}
 
-	std::size_t value_first = colon + 1;
-	while (value_first < last && isLineWS(_outstream.data[_outstream.begin + value_first]))
-		++value_first;
-	std::size_t value_last = last;
-	while (value_last > value_first && isLineWS(_outstream.data[_outstream.begin + value_last - 1]))
-		--value_last;
-
-	std::string key = _outstream.substr(0, colon);
-	std::string value = _outstream.substr(value_first, value_last);
-
-	if (equalCI(key, "Status")) {
-		int code = std::atoi(value.c_str());
-		if (code >= 100 && code <= 599) {
-			_status = static_cast<StatusCode>(code);
-			_has_status = true;
+		// Find separator ':'
+		std::size_t colon_pos = static_cast<std::size_t>(_outstream.find(':'));
+		if (colon_pos == 0) {
+			throw std::runtime_error("CGI response: header field has no field-name");
 		}
-		return false;
+		if (colon_pos == line_end_pos || colon_pos == std::string::npos) {
+			throw std::runtime_error("CGI response: header field has no colon");
+		}
+
+		// field-name is a token: no whitespace or separators allowed, so this
+		// also catches "Content-Type : text/plain" (space before the colon
+		// ends up inside key, and ' ' isn't a tchar)
+		for (std::size_t i = 0; i < colon_pos; ++i) {
+			if (!isTChar(_outstream.data[_outstream.begin + i])) {
+				std::ostringstream oss;
+				oss << "CGI response: invalid character or whitespace in header field-name\n";
+				oss << "culprit: {" + i2a((int)(unsigned char)_outstream.data[_outstream.begin + i]) + "}";
+				throw std::runtime_error(oss.str());
+			}
+		}
+
+		// trim header field-value from whitespaces
+		std::size_t value_first = colon_pos + 1;
+		while (value_first < line_end_pos && isLineWS(_outstream.data[_outstream.begin + value_first]))
+			++value_first;
+		std::size_t value_last = line_end_pos;
+		while (value_last > value_first && isLineWS(_outstream.data[_outstream.begin + value_last - 1]))
+			--value_last;
+
+		std::string key = _outstream.substr(0, colon_pos);
+		std::string value = _outstream.substr(value_first, value_last);
+
+		if (equalCI(key, "Status")) {
+			int code = std::atoi(value.c_str());
+			if (code >= 100 && code <= 599) {
+				_status = static_cast<StatusCode>(code);
+				_has_status = true;
+			}
+		}
+		if (equalCI(key, "Content-Type")) _content_type = value;
+		if (equalCI(key, "Location")) _has_location = true;
+		if (!isIgnored(key)) _headers[key] = value;
+
+		_outstream.mark = _outstream.begin + line_end_pos + _line_end_size;
+		return true;
 	}
-	if (equalCI(key, "Content-Type"))
-		_content_type = value;
-	if (equalCI(key, "Location"))
-		_has_location = true;
-
-	if (!isIgnored(key))
-		_headers[key] = value;
-	return false;
-
 }
 
 // consumes whatever complete lines are in _outstream, same technique as
 // parseRequestLine()/parseHeaders(), just for cgi output
 void CGIProcess::consumeAvailableOutput() {
+
+	while (!_headers_done && _outstream.mark < _outstream.end) {
+
+		bool has_consumed_line;
+		try {
+			has_consumed_line = _consumeHeaderLine();
+		} catch (std::exception& e) {
+			throw std::runtime_error(e.what());
+		}
+		if (has_consumed_line == true) {
+			_outstream.begin = _outstream.mark;
+		}
+	}
 
 	if (_headers_done) {
 		_body += _outstream.substr(0);
@@ -317,25 +359,17 @@ void CGIProcess::consumeAvailableOutput() {
 		return;
 	}
 
-	ssize_t nl;
-	while (!_headers_done/* && _state != ERROR */&& (nl = _outstream.find(http::LF)) != -1) {
-
-		std::size_t line_len = static_cast<std::size_t>(nl);
-		bool blank = _consumeHeaderLine(line_len);
-
-		_outstream.begin += line_len + 1;
-		_outstream.mark = _outstream.begin;
-
-		if (blank) {
-			_headers_done = true;
-			_body += _outstream.substr(0);
-			_outstream.reset();
-			return;
+	if (_outstream.begin == _outstream.end) {
+		_outstream.reset();
+	} else if (_instream.end == _instream.data.size()) {
+		if (_outstream.begin > 0) {
+			// free up what we already committed past
+			_outstream.compact();
+		} else {
+			throw std::runtime_error("read stdout: buffer overflow");
 		}
-
 	}
 
-	_outstream.compact(); // free up what we already committed past
     return;
 }
 

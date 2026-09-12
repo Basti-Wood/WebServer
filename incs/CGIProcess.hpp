@@ -1,6 +1,7 @@
 #pragma once
 #include "HTTPResponse.hpp"
 #include "Buffer.hpp"
+#include <cstddef>
 #include <string>
 #include <vector>
 #include <map>
@@ -24,13 +25,11 @@ struct CGIResult {
 // blocking wait anywhere in this class.
 class CGIProcess {
 public:
-	// enum ScriptState {
-	//     WRITING_PIPES,
-	//     PROCESSING,
-	//     READING_PIPES,
-	//     COMPLETE,
-	//     ERROR
-	// };
+
+	enum LineEnding {
+		LF,
+		CRLF
+	};
 
 	CGIProcess(const std::string& path,
 			const std::vector<std::string>& args,
@@ -77,13 +76,18 @@ private:
 	CGIProcess(const CGIProcess&);
 	CGIProcess& operator=(const CGIProcess&);
 
+	std::size_t _findHeaderLineEnd();
+
 	// parses the line sitting at _outstream.begin, line_len chars long
 	// (not counting the '\n'), straight off the buffer -> _headers/etc.
 	// returns true if it was the blank line ending the headers
-	bool _consumeHeaderLine(std::size_t line_len);
+	bool _consumeHeaderLine();
 	// finds complete lines in _outstream, commits begin past each one;
 	// once the blank line is hit, the rest becomes _body
 	// void _consumeAvailableOutput();
+
+	static const std::size_t           LF_SIZE = 1;
+	static const std::size_t           CRLF_SIZE = 2;
 
 	// stored for spawn() (next step), which forks+execve's using these
 	std::string                        _path;
@@ -117,6 +121,8 @@ private:
 	bool        _has_status;
 	bool        _has_location;
 	bool        _headers_done;
+	LineEnding  _line_ending;
+	std::size_t _line_end_size;
 	std::string _body;
 };
 
